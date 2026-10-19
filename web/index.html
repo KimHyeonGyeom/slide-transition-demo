@@ -29,6 +29,8 @@
   .status { margin:12px 0; min-height:1.5em; font-weight:500; }
   .status.err { color: var(--err); }
   .status.ok { color: var(--ok); }
+  .status { white-space: pre-line; }
+  .banner { background:#fef2f2; border:1px solid #fecaca; color:#991b1b; border-radius:8px; padding:10px 14px; margin:0 0 16px; white-space: pre-line; }
   .grid { display:grid; grid-template-columns: 320px 1fr; gap:16px; align-items:start; }
   @media (max-width: 760px) { .grid { grid-template-columns: 1fr; } }
   .list { list-style:none; margin:0; padding:0; border:1px solid var(--line); border-radius:10px;
@@ -61,9 +63,11 @@
 </head>
 <body>
 <main>
+  <div class="banner" id="banner" hidden></div>
   <h1>슬라이드별 전환 영상 테스트</h1>
   <p class="lead">슬라이드마다 영상을 따로 만듭니다. 슬라이드에 "들어올 때 전환"을 정하면 앞 슬라이드 이미지에서 이 슬라이드 이미지로 바뀌는 전환이
-    그 슬라이드 영상의 처음 T초에 들어갑니다. 영상 길이는 슬라이드 길이 그대로이고, 앞 슬라이드 영상은 건드리지 않습니다.</p>
+    그 슬라이드 영상의 처음 T초에 들어갑니다. 영상 길이는 슬라이드 길이 그대로이고, 앞 슬라이드 영상은 건드리지 않습니다.
+    <br><span id="apiStatus" class="files">API 서버 확인 중...</span></p>
 
   <fieldset>
     <legend>1. 입력</legend>
@@ -106,6 +110,19 @@ const esc = (s) => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt
 const sortByName = (files) => [...files].sort((a, b) => a.name.localeCompare(b.name));
 
 let TRANSITIONS = { popular: [], all: [] };
+const SERVER_HINT = '이 페이지는 python3 web.py 로 띄운 서버에서 열어야 합니다. 주소창이 http://127.0.0.1:8000 (또는 --port 로 정한 포트) 인지, 서버 콘솔에 요청 로그가 찍히는지 확인하세요.';
+
+// fetch 응답을 JSON 으로 읽되, JSON 이 아니면 상태 코드와 본문 앞부분을 담은 오류를 낸다
+async function api(url, options) {
+  let res;
+  try { res = await fetch(url, options); }
+  catch (e) { throw new Error(`서버에 연결할 수 없습니다 (${e.message}). ${SERVER_HINT}`); }
+  const text = await res.text();
+  try { return JSON.parse(text); }
+  catch {
+    throw new Error(`서버가 JSON 이 아닌 응답을 보냈습니다 (HTTP ${res.status}): ${text.replace(/\s+/g, ' ').slice(0, 120)}\n${SERVER_HINT}`);
+  }
+}
 let project = null;   // { id, slides: [{ index, name, duration, thumb, transition: {type, duration}|null, video: url|null }] }
 let selected = 1;
 
@@ -114,8 +131,13 @@ function startAt(k) { let t = 0; for (let i = 0; i < k - 1; i++) t += project.sl
 const round1 = (x) => Math.round(x * 10) / 10;
 
 async function loadTransitions() {
-  const res = await fetch('/api/transitions');
-  TRANSITIONS = await res.json();
+  try {
+    TRANSITIONS = await api('/api/transitions');
+    $('apiStatus').textContent = `API 연결됨 · 이 ffmpeg 의 xfade 전환 ${TRANSITIONS.all.length}종`;
+  } catch (e) {
+    $('apiStatus').textContent = 'API 서버에 연결되지 않았습니다.';
+    const b = $('banner'); b.textContent = 'API 서버에 연결되지 않았습니다. ' + e.message; b.hidden = false;
+  }
 }
 
 $('images').addEventListener('change', () => {
@@ -136,8 +158,7 @@ async function createProject(useSample) {
   setStatus($('status'), useSample ? '샘플 슬라이드를 만드는 중...' : '올리는 중...');
   $('uploadBtn').disabled = $('sampleBtn').disabled = true;
   try {
-    const res = await fetch('/api/upload', { method: 'POST', body: fd });
-    const data = await res.json();
+    const data = await api('/api/upload', { method: 'POST', body: fd });
     if (!data.ok) { setStatus($('status'), '실패: ' + data.error, 'err'); return; }
     project = data.project; selected = Math.min(2, project.slides.length);
     setStatus($('status'), `슬라이드 ${project.slides.length}장. 왼쪽 목록에서 슬라이드를 골라 길이와 전환을 정한 뒤 영상을 만드세요.`, 'ok');
@@ -145,7 +166,7 @@ async function createProject(useSample) {
     renderList(); renderPanel(); drawTimeline();
     $('editor').scrollIntoView({ behavior: 'smooth' });
   } catch (e) {
-    setStatus($('status'), '요청 실패: ' + e, 'err');
+    setStatus($('status'), '요청 실패: ' + e.message, 'err');
   } finally {
     $('uploadBtn').disabled = $('sampleBtn').disabled = false;
   }
@@ -247,9 +268,8 @@ async function renderSlide(k) {
   const onPanel = (k === selected);
   if (onPanel) { $('renderSlideBtn').disabled = true; setStatus($('slideStatus'), '만드는 중...'); }
   try {
-    const res = await fetch('/api/render_slide', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-                                                   body: JSON.stringify(body) });
-    const data = await res.json();
+    const data = await api('/api/render_slide', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+                                                  body: JSON.stringify(body) });
     if (!data.ok) { if (onPanel) setStatus($('slideStatus'), '실패: ' + data.error, 'err'); return false; }
     s.video = data.video; s.duration = data.slide.duration; s.transition = data.slide.transition;
     renderList(); drawTimeline();
@@ -262,7 +282,7 @@ async function renderSlide(k) {
     }
     return true;
   } catch (e) {
-    if (onPanel) setStatus($('slideStatus'), '요청 실패: ' + e, 'err');
+    if (onPanel) setStatus($('slideStatus'), '요청 실패: ' + e.message, 'err');
     return false;
   } finally {
     if (onPanel) $('renderSlideBtn').disabled = false;
@@ -287,9 +307,8 @@ async function concatAll() {
   $('renderAllBtn').disabled = $('concatBtn').disabled = true; $('result').hidden = true;
   setStatus($('allStatus'), '이어 붙이는 중...');
   try {
-    const res = await fetch('/api/concat', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-                                            body: JSON.stringify({ project: project.id }) });
-    const data = await res.json();
+    const data = await api('/api/concat', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+                                           body: JSON.stringify({ project: project.id }) });
     if (!data.ok) { setStatus($('allStatus'), '실패: ' + data.error, 'err'); return; }
     const r = data.report;
     setStatus($('allStatus'), (r.ok ? 'OK ' : '길이 불일치! ') + `슬라이드 합계 ${r.expected.toFixed(3)}s / 출력 ${r.actual.toFixed(3)}s (재인코딩 없음)`, r.ok ? 'ok' : 'err');
@@ -297,7 +316,7 @@ async function concatAll() {
     $('report').textContent = r.lines.join('\n'); $('cmd').textContent = data.command;
     $('result').hidden = false;
   } catch (e) {
-    setStatus($('allStatus'), '요청 실패: ' + e, 'err');
+    setStatus($('allStatus'), '요청 실패: ' + e.message, 'err');
   } finally {
     $('renderAllBtn').disabled = $('concatBtn').disabled = false;
   }

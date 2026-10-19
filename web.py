@@ -273,6 +273,7 @@ def main() -> None:
     JOBS.mkdir(exist_ok=True)
     server = ThreadingHTTPServer((args.host, args.port), Handler)
     print(f"브라우저에서 열기: http://{args.host}:{args.port}   (종료: Ctrl+C)", flush=True)
+    print("이 주소로 열어야 /api/... 요청이 이 서버로 옵니다. 다른 서버(Live Server, http.server 등)로 열면 API 가 동작하지 않습니다.", flush=True)
     try:
         server.serve_forever()
     except KeyboardInterrupt:
