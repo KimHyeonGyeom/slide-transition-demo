@@ -14,9 +14,15 @@ TTS 오디오는 아직 다루지 않는다 (영상만 출력).
 
 사용 예
   python3 slide_render.py render --image 2.png --duration 3.5 --out slide2.mp4
-  python3 slide_render.py render --image 2.png --duration 3.5 --prev 1.png --transition fade --tdur 0.5 --out slide2.mp4
+  python3 slide_render.py render --image 2.png --duration 3.5 --prev 1.png --transition push_right --out slide2.mp4
+  python3 slide_render.py render --image 2.png --duration 3.5 --prev 1.png --transition wipeleft --tdur 0.6 --easing none --out slide2.mp4
   python3 slide_render.py concat slide1.mp4 slide2.mp4 slide3.mp4 --out all.mp4   # 재인코딩 없이 이어 붙이기
-  python3 slide_render.py sample      # 샘플 4장: 2번 fade, 4번 slideleft 로 만들고 all.mp4 까지
+  python3 slide_render.py sample      # 샘플 4장: 2번 페이드, 4번 밀어내기로 만들고 all.mp4 까지
+  python3 slide_render.py list        # 프리셋(파워포인트 이름)과 xfade 원본 목록
+
+전환 프리셋은 파워포인트 이름과 기본 길이를 따르고, 움직임 계열에는 천천히 시작해 천천히 끝나는
+이징(inout)을 넣는다. xfade 자체는 속도가 일정하므로, 전환 구간을 4배 프레임레이트로 선형 렌더한 뒤
+setpts 로 시간축을 휘고 fps 로 다시 샘플해서 만든다.
 
 전환 이름 전체 목록: ffmpeg -h filter=xfade
 """
@@ -32,6 +38,42 @@ from pathlib import Path
 WIDTH, HEIGHT, FPS = 1920, 1080, 30   # 모든 슬라이드 영상의 공통 규격 (이어 붙이려면 같아야 한다)
 MAX_TRANSITION = 1.0                  # 전환 길이 상한(초)
 DEFAULT_TRANSITION_DURATION = 0.5
+EASE_OVERSAMPLE = 4                   # 이징: 전환 구간을 FPS*4 로 먼저 렌더한 뒤 시간축을 휘어 FPS 로 다시 샘플
+
+# 파워포인트 스타일 프리셋: 키 -> (한글 이름, xfade 전환, 기본 길이(초), 기본 움직임)
+# 방향은 "새 슬라이드가 어디에서 들어오는지" 기준 (파워포인트의 '오른쪽에서' 와 같은 표현)
+PRESETS = {
+    "fade":          ("페이드",                  "fade",        0.7, "none"),
+    "fade_black":    ("페이드 (검정 거쳐서)",     "fadeblack",   0.7, "none"),
+    "push_right":    ("밀어내기 (오른쪽에서)",    "slideleft",   1.0, "inout"),
+    "push_left":     ("밀어내기 (왼쪽에서)",      "slideright",  1.0, "inout"),
+    "push_bottom":   ("밀어내기 (아래에서)",      "slideup",     1.0, "inout"),
+    "push_top":      ("밀어내기 (위에서)",        "slidedown",   1.0, "inout"),
+    "wipe_right":    ("닦아내기 (오른쪽에서)",    "smoothleft",  1.0, "inout"),
+    "wipe_left":     ("닦아내기 (왼쪽에서)",      "smoothright", 1.0, "inout"),
+    "wipe_bottom":   ("닦아내기 (아래에서)",      "smoothup",    1.0, "inout"),
+    "wipe_top":      ("닦아내기 (위에서)",        "smoothdown",  1.0, "inout"),
+    "cover_right":   ("덮기 (오른쪽에서)",        "coverleft",   1.0, "inout"),
+    "cover_left":    ("덮기 (왼쪽에서)",          "coverright",  1.0, "inout"),
+    "uncover_left":  ("벗기기 (왼쪽으로)",        "revealleft",  1.0, "inout"),
+    "uncover_right": ("벗기기 (오른쪽으로)",      "revealright", 1.0, "inout"),
+    "split_h":       ("나누기 (가로, 바깥쪽으로)", "horzopen",    1.0, "inout"),
+    "split_v":       ("나누기 (세로, 바깥쪽으로)", "vertopen",    1.0, "inout"),
+    "shape_circle":  ("도형 (원, 바깥쪽으로)",    "circleopen",  1.0, "inout"),
+    "clock":         ("시계",                    "radial",      1.0, "inout"),
+    "zoom":          ("확대",                    "zoomin",      1.0, "inout"),
+    "blinds":        ("블라인드",                "hlslice",     1.0, "inout"),
+    "dissolve":      ("디졸브",                  "dissolve",    1.0, "none"),
+    "flash":         ("밝기 변화 (흰색 거쳐서)",  "fadewhite",   0.7, "none"),
+}
+EASINGS = {
+    "inout": "부드럽게 (천천히 시작해서 천천히 끝)",
+    "out":   "감속 (빠르게 시작해서 천천히 끝)",
+    "none":  "일정한 속도",
+}
+# 원본 xfade 이름을 직접 쓸 때, 움직임이 아니라 섞임 위주라 이징이 의미 없는 것들
+LINEAR_RAW = {"fade", "fadeblack", "fadewhite", "fadefast", "fadeslow", "fadegrays",
+              "dissolve", "pixelize", "hblur", "distance"}
 
 # 자주 쓰는 전환효과
 POPULAR_TRANSITIONS = [
@@ -100,6 +142,29 @@ def xfade_transitions() -> list[str]:
     return [n for n in names if n != "custom"] or list(POPULAR_TRANSITIONS)
 
 
+def resolve_transition(name: str) -> tuple[str, float, str, str]:
+    """프리셋 키 또는 xfade 원본 이름 -> (xfade 이름, 기본 길이, 기본 움직임, 표시 이름)"""
+    if name in PRESETS:
+        label, xf, dur, ease = PRESETS[name]
+        return xf, dur, ease, label
+    return name, DEFAULT_TRANSITION_DURATION, ("none" if name in LINEAR_RAW else "inout"), name
+
+
+def ease_setpts(easing: str, t: float) -> str | None:
+    """전환 구간(0~t초)의 시간축을 휘는 setpts 식. 선형으로 렌더한 프레임(진행도 p = T/t)을
+    원하는 속도 곡선의 역함수 위치로 옮긴다. 그 뒤 fps 필터가 일정한 간격으로 다시 샘플한다.
+      inout: smoothstep p = u^2(3-2u) 의 역함수 u = 0.5 - sin(asin(1-2p)/3)
+      out:   ease-out   p = 1-(1-u)^2 의 역함수 u = 1 - sqrt(1-p)
+    T 는 setpts 의 프레임 시각 변수(초)."""
+    if easing == "inout":
+        inv = f"(0.5-sin(asin(1-2*min(T/{t:.4f},1))/3))"
+    elif easing == "out":
+        inv = f"(1-sqrt(1-min(T/{t:.4f},1)))"
+    else:
+        return None
+    return f"if(lt(T,{t:.4f}),{inv}*{t:.4f}/TB,PTS)"
+
+
 def norm_chain(w: int = WIDTH, h: int = HEIGHT, fps: int = FPS) -> str:
     """이미지를 공통 규격으로. 비율이 다르면 여백(검정)을 채운다."""
     return (f"scale={w}:{h}:force_original_aspect_ratio=decrease,"
@@ -109,50 +174,81 @@ def norm_chain(w: int = WIDTH, h: int = HEIGHT, fps: int = FPS) -> str:
 # ---------------------------------------------------------------- 슬라이드 1장 렌더
 def build_render_command(image: Path, duration: float, out: Path,
                          prev_image: Path | None = None, transition: str | None = None,
-                         tdur: float = DEFAULT_TRANSITION_DURATION,
+                         tdur: float | None = None, easing: str | None = None,
                          w: int = WIDTH, h: int = HEIGHT, fps: int = FPS) -> list[str]:
-    """슬라이드 1장 영상의 ffmpeg 인자. 전환이 있으면 처음 tdur 초가 prev_image -> image 전환."""
+    """슬라이드 1장 영상의 ffmpeg 인자. 전환이 있으면 처음 tdur 초가 prev_image -> image 전환.
+
+    transition 은 프리셋 키(push_right 등) 또는 xfade 원본 이름. tdur/easing 을 생략하면 프리셋 기본값.
+    easing 이 none 이 아니면: 전환 구간만 fps*EASE_OVERSAMPLE 로 선형 렌더 -> setpts 로 시간축을 휨
+    -> fps 로 다시 샘플 -> 나머지 구간(이 슬라이드 정지 화면)과 concat. 길이는 그대로 d.
+    """
     d = snap(duration, fps)
     if d <= 0:
         raise ValueError("슬라이드 길이는 0보다 커야 합니다")
     norm = norm_chain(w, h, fps)
     use_transition = bool(prev_image) and bool(transition) and transition != "none"
-    if use_transition:
-        t = snap(tdur, fps)
-        if not 0 < t <= MAX_TRANSITION + 1e-9:
-            raise ValueError(f"전환 길이는 0 초과 {MAX_TRANSITION}초 이하여야 합니다")
-        if t >= d:
-            raise ValueError("전환 길이는 슬라이드 길이보다 짧아야 합니다")
-        # 입력 0: 앞 슬라이드 이미지를 t초, 입력 1: 이 슬라이드 이미지를 d초.
-        # xfade offset=0, duration=t -> 출력 길이 = t + d - t = d. 처음 t초만 섞이고 나머지는 이 슬라이드.
-        cmd = ["-loop", "1", "-framerate", str(fps), "-t", f"{t:.4f}", "-i", str(prev_image),
-               "-loop", "1", "-framerate", str(fps), "-t", f"{d:.4f}", "-i", str(image),
-               "-filter_complex",
-               f"[0:v]{norm}[a];[1:v]{norm}[b];[a][b]xfade=transition={transition}:duration={t:.4f}:offset=0[v]",
-               "-map", "[v]"]
-    else:
-        cmd = ["-loop", "1", "-framerate", str(fps), "-t", f"{d:.4f}", "-i", str(image), "-vf", norm]
-    cmd += ["-t", f"{d:.4f}",
-            "-c:v", "libx264", "-preset", "medium", "-tune", "stillimage", "-crf", "18",
+    if not use_transition:
+        return ["-loop", "1", "-framerate", str(fps), "-t", f"{d:.4f}", "-i", str(image), "-vf", norm,
+                "-t", f"{d:.4f}", *_encode_args(out)]
+
+    xf, def_dur, def_ease, _ = resolve_transition(transition)
+    t = snap(tdur if tdur is not None else def_dur, fps)
+    easing = easing or def_ease
+    if easing not in EASINGS:
+        raise ValueError("움직임(easing)은 inout / out / none 중 하나")
+    if not 0 < t <= MAX_TRANSITION + 1e-9:
+        raise ValueError(f"전환 길이는 0 초과 {MAX_TRANSITION}초 이하여야 합니다")
+    if t >= d:
+        raise ValueError("전환 길이는 슬라이드 길이보다 짧아야 합니다")
+
+    setpts = ease_setpts(easing, t)
+    if setpts is None:
+        # 입력 0: 앞 이미지 t초, 입력 1: 이 이미지 d초. xfade offset=0 -> 출력 길이 = t + d - t = d
+        return ["-loop", "1", "-framerate", str(fps), "-t", f"{t:.4f}", "-i", str(prev_image),
+                "-loop", "1", "-framerate", str(fps), "-t", f"{d:.4f}", "-i", str(image),
+                "-filter_complex",
+                f"[0:v]{norm}[a];[1:v]{norm}[b];[a][b]xfade=transition={xf}:duration={t:.4f}:offset=0[v]",
+                "-map", "[v]", "-t", f"{d:.4f}", *_encode_args(out)]
+
+    hi = fps * EASE_OVERSAMPLE
+    norm_hi = norm_chain(w, h, hi)
+    extra = 2 / fps   # 전환 뒤 몇 프레임을 더 뽑아 두고 trim 으로 정확히 t초를 만든다
+    return ["-loop", "1", "-framerate", str(hi), "-t", f"{t:.4f}", "-i", str(prev_image),
+            "-loop", "1", "-framerate", str(hi), "-t", f"{t + extra:.4f}", "-i", str(image),
+            "-loop", "1", "-framerate", str(fps), "-t", f"{d - t:.4f}", "-i", str(image),
+            "-filter_complex",
+            f"[0:v]{norm_hi}[a];[1:v]{norm_hi}[b];"
+            f"[a][b]xfade=transition={xf}:duration={t:.4f}:offset=0,"
+            f"setpts='{setpts}',fps={fps},trim=duration={t:.4f},setpts=PTS-STARTPTS[tr];"
+            f"[2:v]{norm}[rest];[tr][rest]concat=n=2:v=1:a=0[v]",
+            "-map", "[v]", "-t", f"{d:.4f}", *_encode_args(out)]
+
+
+def _encode_args(out: Path) -> list[str]:
+    return ["-c:v", "libx264", "-preset", "medium", "-tune", "stillimage", "-crf", "18",
             "-pix_fmt", "yuv420p", "-movflags", "+faststart", str(out)]
-    return cmd
 
 
 def render_slide(image: Path, duration: float, out: Path, prev_image: Path | None = None,
-                 transition: str | None = None, tdur: float = DEFAULT_TRANSITION_DURATION) -> list[str]:
-    cmd = build_render_command(image, duration, out, prev_image, transition, tdur)
+                 transition: str | None = None, tdur: float | None = None,
+                 easing: str | None = None) -> list[str]:
+    cmd = build_render_command(image, duration, out, prev_image, transition, tdur, easing)
     out.parent.mkdir(parents=True, exist_ok=True)
     ffmpeg(*cmd)
     return cmd
 
 
-def report_slide(out: Path, duration: float, transition: str | None, tdur: float) -> dict:
+def report_slide(out: Path, duration: float, transition: str | None, tdur: float | None = None,
+                 easing: str | None = None) -> dict:
     expected = snap(duration)
     actual = probe_duration(out)
     ok = abs(expected - actual) <= 1 / FPS + 1e-6
     lines = [f"슬라이드 길이 {expected:.3f}s / 출력 {actual:.3f}s  " + ("OK 길이 유지" if ok else "!! 길이 불일치")]
     if transition and transition != "none":
-        lines.append(f"  0.000s ~ {snap(tdur):.3f}s  {transition} (앞 슬라이드 이미지 -> 이 슬라이드)")
+        xf, def_dur, def_ease, label = resolve_transition(transition)
+        t = snap(tdur if tdur is not None else def_dur)
+        ease = easing or def_ease
+        lines.append(f"  0.000s ~ {t:.3f}s  {label} [xfade {xf}], 움직임: {EASINGS[ease]} (앞 슬라이드 이미지 -> 이 슬라이드)")
     else:
         lines.append("  전환 없음")
     print(f"-> {out}")
@@ -226,30 +322,39 @@ def main() -> None:
     r.add_argument("--image", type=Path, required=True, help="이 슬라이드 이미지")
     r.add_argument("--duration", type=float, required=True, help="슬라이드 길이(초)")
     r.add_argument("--prev", type=Path, help="앞 슬라이드 이미지 (전환을 넣을 때)")
-    r.add_argument("--transition", default="none", help="xfade 전환 이름 (기본 none)")
-    r.add_argument("--tdur", type=float, default=DEFAULT_TRANSITION_DURATION,
-                   help=f"전환 길이(초), 최대 {MAX_TRANSITION}")
+    r.add_argument("--transition", default="none",
+                   help="프리셋 키(push_right, wipe_left, fade ...) 또는 xfade 원본 이름. 기본 none. 목록: --list")
+    r.add_argument("--tdur", type=float, help=f"전환 길이(초), 최대 {MAX_TRANSITION}. 생략하면 프리셋 기본값")
+    r.add_argument("--easing", choices=list(EASINGS), help="움직임: inout / out / none. 생략하면 프리셋 기본값")
     r.add_argument("--out", type=Path, required=True)
 
     c = sub.add_parser("concat", help="슬라이드 영상들을 재인코딩 없이 이어 붙이기")
     c.add_argument("videos", nargs="+", type=Path)
     c.add_argument("--out", type=Path, required=True)
 
-    sub.add_parser("sample", help="샘플 4장을 만들고 2번 fade, 4번 slideleft 로 렌더한 뒤 이어 붙이기")
+    sub.add_parser("sample", help="샘플 4장을 만들고 2번 페이드, 4번 밀어내기로 렌더한 뒤 이어 붙이기")
+    sub.add_parser("list", help="프리셋과 xfade 전환 목록")
     args = ap.parse_args()
+
+    if args.cmd == "list":
+        print("프리셋 (키: 이름, xfade, 기본 길이, 움직임)")
+        for key, (label, xf, dur, ease) in PRESETS.items():
+            print(f"  {key:<14} {label:<22} {xf:<12} {dur}s  {ease}")
+        print("xfade 원본:", " ".join(xfade_transitions()))
+        return
 
     if args.cmd == "render":
         if args.transition != "none" and not args.prev:
             sys.exit("전환을 넣으려면 --prev 로 앞 슬라이드 이미지를 주세요")
-        render_slide(args.image, args.duration, args.out, args.prev, args.transition, args.tdur)
-        ok = report_slide(args.out, args.duration, args.transition, args.tdur)["ok"]
+        render_slide(args.image, args.duration, args.out, args.prev, args.transition, args.tdur, args.easing)
+        ok = report_slide(args.out, args.duration, args.transition, args.tdur, args.easing)["ok"]
     elif args.cmd == "concat":
         concat_videos(args.videos, args.out)
         ok = report_concat(args.videos, args.out)["ok"]
     else:
         OUT.mkdir(exist_ok=True)
         images = make_sample_images(4)
-        settings = {2: ("fade", 0.5), 4: ("slideleft", 0.8)}   # k: (전환, 길이)
+        settings = {2: ("fade", 0.7), 4: ("push_right", 1.0)}   # k: (전환, 길이)
         videos, ok = [], True
         for k, image in enumerate(images, start=1):
             out = OUT / f"slide{k}.mp4"

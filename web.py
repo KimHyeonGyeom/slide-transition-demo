@@ -36,6 +36,7 @@ JOBS = BASE / "jobs"
 
 DEFAULT_SLIDE_DURATION = 3.0
 SAMPLE_SLIDES = 4
+XFADE_ALL = sr.xfade_transitions()   # 설치된 ffmpeg 의 xfade 원본 전환 목록 (시작 시 한 번만 조회)
 PROJECT_ID = re.compile(r"^[0-9]{8}-[0-9]{6}-[0-9a-f]{6}$")
 CONTENT_TYPES = {".mp4": "video/mp4", ".jpg": "image/jpeg", ".png": "image/png", ".json": "application/json"}
 
@@ -159,19 +160,28 @@ def render_slide_job(body: dict) -> dict:
     s = slides[k - 1]
     duration = float(body.get("duration") or s["duration"])
 
-    t = body.get("transition") or None
-    ttype = str(t.get("type") or "none") if isinstance(t, dict) else "none"
-    tdur = float(t.get("duration") or sr.DEFAULT_TRANSITION_DURATION) if isinstance(t, dict) else 0.0
+    t = body.get("transition") if isinstance(body.get("transition"), dict) else {}
+    ttype = str(t.get("type") or "none")
     if k == 1:
-        ttype, tdur = "none", 0.0        # 첫 슬라이드는 앞 슬라이드가 없다
+        ttype = "none"                   # 첫 슬라이드는 앞 슬라이드가 없다
+    tdur, easing, label = 0.0, "none", ""
+    if ttype != "none":
+        if ttype not in sr.PRESETS and ttype not in XFADE_ALL:
+            raise ValueError(f"알 수 없는 전환: {ttype}")
+        _, def_dur, def_ease, label = sr.resolve_transition(ttype)
+        tdur = float(t.get("duration") or def_dur)
+        easing = str(t.get("easing") or def_ease)
+        if easing not in sr.EASINGS:
+            raise ValueError("움직임(easing)은 inout / out / none 중 하나")
     prev = Path(slides[k - 2]["image"]) if ttype != "none" else None
 
     out = JOBS / proj["id"] / f"slide{k}_{uuid.uuid4().hex[:6]}.mp4"
-    cmd = sr.render_slide(Path(s["image"]), duration, out, prev, ttype, tdur)
-    rep = sr.report_slide(out, duration, ttype, tdur)
+    cmd = sr.render_slide(Path(s["image"]), duration, out, prev, ttype, tdur, easing)
+    rep = sr.report_slide(out, duration, ttype, tdur, easing)
 
     s["duration"] = sr.snap(duration)
-    s["transition"] = {"type": ttype, "duration": sr.snap(tdur)} if ttype != "none" else None
+    s["transition"] = ({"type": ttype, "duration": sr.snap(tdur), "easing": easing, "label": label}
+                       if ttype != "none" else None)
     s["video"] = str(out)
     s["video_url"] = f"/jobs/{proj['id']}/{out.name}"
     save_project(proj)
@@ -202,7 +212,11 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/":
             return self._send_file(WEB_DIR / "index.html", "text/html; charset=utf-8")
         if path == "/api/transitions":
-            return self._send_json({"popular": sr.POPULAR_TRANSITIONS, "all": sr.xfade_transitions()})
+            return self._send_json({
+                "presets": [{"key": k, "label": v[0], "xfade": v[1], "duration": v[2], "easing": v[3]}
+                            for k, v in sr.PRESETS.items()],
+                "easings": sr.EASINGS, "linear_raw": sorted(sr.LINEAR_RAW),
+                "default_duration": sr.DEFAULT_TRANSITION_DURATION, "all": XFADE_ALL})
         if path.startswith("/jobs/"):
             target = (JOBS / path[len("/jobs/"):]).resolve()
             if target.is_file() and JOBS.resolve() in target.parents:

@@ -109,7 +109,7 @@ const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const sortByName = (files) => [...files].sort((a, b) => a.name.localeCompare(b.name));
 
-let TRANSITIONS = { popular: [], all: [] };
+let TRANSITIONS = { presets: [], easings: {}, linear_raw: [], default_duration: 0.5, all: [] };
 const SERVER_HINT = '이 페이지는 python3 web.py 로 띄운 서버에서 열어야 합니다. 주소창이 http://127.0.0.1:8000 (또는 --port 로 정한 포트) 인지, 서버 콘솔에 요청 로그가 찍히는지 확인하세요.';
 
 // fetch 응답을 JSON 으로 읽되, JSON 이 아니면 상태 코드와 본문 앞부분을 담은 오류를 낸다
@@ -133,7 +133,7 @@ const round1 = (x) => Math.round(x * 10) / 10;
 async function loadTransitions() {
   try {
     TRANSITIONS = await api('/api/transitions');
-    $('apiStatus').textContent = `API 연결됨 · 이 ffmpeg 의 xfade 전환 ${TRANSITIONS.all.length}종`;
+    $('apiStatus').textContent = `API 연결됨 · 파워포인트 스타일 프리셋 ${TRANSITIONS.presets.length}종 + xfade 원본 ${TRANSITIONS.all.length}종`;
   } catch (e) {
     $('apiStatus').textContent = 'API 서버에 연결되지 않았습니다.';
     const b = $('banner'); b.textContent = 'API 서버에 연결되지 않았습니다. ' + e.message; b.hidden = false;
@@ -179,7 +179,7 @@ function renderList() {
     const li = document.createElement('li');
     li.className = s.index === selected ? 'selected' : '';
     const t = s.transition;
-    const badges = (t ? `<span class="badge">${esc(t.type)} ${t.duration}s</span>` : (s.index > 1 ? '<span class="badge plain">전환 없음</span>' : ''))
+    const badges = (t ? `<span class="badge">${esc(t.label || t.type)} ${t.duration}s</span>` : (s.index > 1 ? '<span class="badge plain">전환 없음</span>' : ''))
                  + (s.video ? '<span class="badge done">영상 ✓</span>' : '');
     li.innerHTML = `<img src="${s.thumb}" alt="">
       <div class="meta"><div class="name">${s.index}. ${esc(s.name)}</div>
@@ -192,22 +192,38 @@ function renderList() {
 function fillTransitionSelect(sel, current) {
   sel.innerHTML = '';
   sel.appendChild(new Option('없음', 'none'));
-  const g1 = document.createElement('optgroup'); g1.label = '자주 쓰는 전환';
-  TRANSITIONS.popular.forEach(n => g1.appendChild(new Option(n, n)));
-  const g2 = document.createElement('optgroup'); g2.label = '전체';
-  TRANSITIONS.all.filter(n => !TRANSITIONS.popular.includes(n)).forEach(n => g2.appendChild(new Option(n, n)));
+  const g1 = document.createElement('optgroup'); g1.label = '파워포인트 스타일';
+  TRANSITIONS.presets.forEach(p => g1.appendChild(new Option(p.label, p.key)));
+  const keys = new Set(TRANSITIONS.presets.map(p => p.key));
+  const g2 = document.createElement('optgroup'); g2.label = 'ffmpeg xfade 원본';
+  TRANSITIONS.all.filter(n => !keys.has(n)).forEach(n => g2.appendChild(new Option(n, n)));
   sel.append(g1, g2);
   sel.value = current;
 }
 
+function fillEasingSelect(sel, current) {
+  sel.innerHTML = '';
+  Object.entries(TRANSITIONS.easings).forEach(([k, v]) => sel.appendChild(new Option(v, k)));
+  sel.value = current;
+}
+
+// 전환 종류별 기본 길이와 움직임 (프리셋은 파워포인트 기본값, 원본 이름은 공통 기본값)
+function transitionDefaults(type) {
+  const p = TRANSITIONS.presets.find(p => p.key === type);
+  if (p) return { duration: p.duration, easing: p.easing };
+  return { duration: TRANSITIONS.default_duration, easing: TRANSITIONS.linear_raw.includes(type) ? 'none' : 'inout' };
+}
+function labelOf(type) { const p = TRANSITIONS.presets.find(p => p.key === type); return p ? p.label : type; }
+
 function renderPanel() {
   const p = $('panel');
   const s = project.slides[selected - 1];
-  const t = s.transition || { type: 'none', duration: project.default_transition_duration };
+  const t = s.transition || { type: 'none', duration: TRANSITIONS.default_duration, easing: 'inout' };
   const transitionUI = selected > 1 ? `
       <div><label for="ptype">들어올 때 전환</label><select id="ptype"></select></div>
       <div><label for="pdur">전환 길이 (초, 최대 ${project.max_transition})</label>
-        <input id="pdur" type="number" min="0.1" max="${project.max_transition}" step="0.1" value="${t.duration}"></div>` : '';
+        <input id="pdur" type="number" min="0.1" max="${project.max_transition}" step="0.1" value="${t.duration}"></div>
+      <div><label for="pease">움직임</label><select id="pease"></select></div>` : '';
   p.innerHTML = `
     <h2>${selected}번 슬라이드 <small>${esc(s.name)}</small></h2>
     <div class="row">
@@ -225,8 +241,13 @@ function renderPanel() {
     <details id="slideCmdBox" hidden><summary>실행한 ffmpeg 명령</summary><pre id="slideCmd"></pre></details>`;
   if (selected > 1) {
     fillTransitionSelect($('ptype'), t.type);
-    $('ptype').addEventListener('change', saveSettings);
+    fillEasingSelect($('pease'), t.easing || 'inout');
+    $('ptype').addEventListener('change', () => {       // 종류를 바꾸면 그 전환의 기본 길이/움직임으로
+      const d = transitionDefaults($('ptype').value);
+      $('pdur').value = d.duration; $('pease').value = d.easing; saveSettings();
+    });
     $('pdur').addEventListener('change', saveSettings);
+    $('pease').addEventListener('change', saveSettings);
   }
   $('sdur').addEventListener('change', saveSettings);
   $('renderSlideBtn').addEventListener('click', () => renderSlide(selected));
@@ -244,8 +265,9 @@ function updateNote() {
   const prev = project.slides[selected - 2];
   const t = s.transition;
   $('pnote').innerHTML = t
-    ? `처음 <b>${t.duration}</b>초 동안 ${selected - 1}번 이미지(${esc(prev.name)})에서 ${selected}번 이미지로 <b>${esc(t.type)}</b> 전환이 일어나고,
-       그 뒤로는 ${selected}번 이미지입니다. 영상 길이는 <b>${d}</b>초 그대로이며 ${selected - 1}번 영상은 건드리지 않습니다.`
+    ? `처음 <b>${t.duration}</b>초 동안 ${selected - 1}번 이미지(${esc(prev.name)})에서 ${selected}번 이미지로 <b>${esc(labelOf(t.type))}</b> 전환이 일어나고,
+       그 뒤로는 ${selected}번 이미지입니다. 움직임: ${esc(TRANSITIONS.easings[t.easing] || t.easing)}.
+       영상 길이는 <b>${d}</b>초 그대로이며 ${selected - 1}번 영상은 건드리지 않습니다.`
     : `전환 없음. ${selected}번 이미지만으로 <b>${d}</b>초 영상을 만듭니다.`;
 }
 
@@ -255,9 +277,9 @@ function saveSettings() {
   $('sdur').value = s.duration;
   if (selected > 1) {
     const type = $('ptype').value;
-    const dur = round1(Math.min(project.max_transition, Math.max(0.1, Number($('pdur').value) || project.default_transition_duration)));
+    const dur = round1(Math.min(project.max_transition, Math.max(0.1, Number($('pdur').value) || TRANSITIONS.default_duration)));
     $('pdur').value = dur;
-    s.transition = type === 'none' ? null : { type, duration: dur };
+    s.transition = type === 'none' ? null : { type, duration: dur, easing: $('pease').value, label: labelOf(type) };
   }
   updateNote(); renderList(); drawTimeline();
 }
@@ -336,7 +358,7 @@ function drawTimeline() {
       const b = document.createElement('div'); b.className = 'tr';
       const start = startAt(s.index);
       b.style.left = (start / total * 100) + '%'; b.style.width = (s.transition.duration / total * 100) + '%';
-      b.textContent = s.transition.type; b.title = `${s.transition.type} ${start.toFixed(2)}~${(start + s.transition.duration).toFixed(2)}s`;
+      b.textContent = s.transition.label || s.transition.type; b.title = `${s.transition.label || s.transition.type} ${start.toFixed(2)}~${(start + s.transition.duration).toFixed(2)}s`;
       tl.appendChild(b);
     }
   });
