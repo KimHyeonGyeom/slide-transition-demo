@@ -358,7 +358,9 @@ function drawTimeline() {
       const b = document.createElement('div'); b.className = 'tr';
       const start = startAt(s.index);
       b.style.left = (start / total * 100) + '%'; b.style.width = (s.transition.duration / total * 100) + '%';
-      b.textContent = s.transition.label || s.transition.type; b.title = `${s.transition.label || s.transition.type} ${start.toFixed(2)}~${(start + s.transition.duration).toFixed(2)}s`;
+      const full = s.transition.label || s.transition.type;
+      b.textContent = full.split(' (')[0];   // 좁은 띠에는 방향 없이 이름만
+      b.title = `${full} ${start.toFixed(2)}~${(start + s.transition.duration).toFixed(2)}s`;
       tl.appendChild(b);
     }
   });
