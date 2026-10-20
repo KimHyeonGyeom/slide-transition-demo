@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
-"""slide_render 를 브라우저에서 써 볼 수 있는 작은 웹 UI. 파이썬 표준 라이브러리만 사용.
+"""slide_transition 을 브라우저에서 써 볼 수 있는 작은 웹 UI. 파이썬 표준 라이브러리만 사용.
 
   python3 web.py              # http://127.0.0.1:8000 에서 열림
   python3 web.py --port 9000
 
 흐름
-  1. 슬라이드 이미지(2장 이상)를 올리거나 "샘플 4장으로 시작"                      POST /api/upload
-  2. 왼쪽 목록에서 슬라이드를 고르고 길이(초)와 들어올 때 전환(종류/길이)을 정한 뒤
-     "이 슬라이드 영상 만들기". k 번 영상은 k 번 이미지(전환이 있으면 k-1 번 이미지도)만으로 만든다
-                                                                                   POST /api/render_slide
-  3. 만든 슬라이드 영상들을 재인코딩 없이 이어 붙여 전체를 확인                      POST /api/concat
-업로드, 썸네일, 슬라이드 영상, 이어 붙인 영상은 jobs/<프로젝트 id>/ 아래에 남는다.
+  1. 슬라이드 영상(음성 포함)들과 슬라이드 이미지들을 올리거나 "샘플 4장으로 시작"          POST /api/upload
+  2. 왼쪽 목록에서 슬라이드를 고르고 들어올 때 전환(종류/길이/움직임)을 정한 뒤 "전환본 만들기".
+     k 번 영상의 처음 T초가 "k-1 번 이미지 -> k 번 영상" 전환으로 바뀐다. 첫 슬라이드는 검정/흰색 화면에서.
+     결과가 원본과 해상도/fps/프레임 수/길이/음성이 같은지 자동으로 검사한다                  POST /api/apply
+  3. 전환본(없으면 원본)을 순서대로 이어 붙여 전체를 확인 (확인용, 재인코딩)                    POST /api/concat
+업로드, 썸네일, 전환본, 이어 붙인 영상은 jobs/<프로젝트 id>/ 아래에 남는다.
 """
 from __future__ import annotations
 
@@ -28,17 +28,21 @@ from pathlib import Path
 from urllib.parse import unquote, urlsplit
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-import slide_render as sr  # noqa: E402
+import slide_render as sr      # noqa: E402  프리셋, 이징, xfade 목록
+import slide_transition as st  # noqa: E402  영상에 전환 붙이기, 검증
 
 BASE = Path(__file__).resolve().parent
 WEB_DIR = BASE / "web"
 JOBS = BASE / "jobs"
-
-DEFAULT_SLIDE_DURATION = 3.0
 SAMPLE_SLIDES = 4
-XFADE_ALL = sr.xfade_transitions()   # 설치된 ffmpeg 의 xfade 원본 전환 목록 (시작 시 한 번만 조회)
 PROJECT_ID = re.compile(r"^[0-9]{8}-[0-9]{6}-[0-9a-f]{6}$")
 CONTENT_TYPES = {".mp4": "video/mp4", ".jpg": "image/jpeg", ".png": "image/png", ".json": "application/json"}
+
+try:
+    ENCODER = st.pick_encoder()
+except ValueError as e:
+    sys.exit(str(e))
+XFADE_ALL = sr.xfade_transitions()
 
 
 # ---------------------------------------------------------------- 업로드
@@ -78,11 +82,12 @@ def save_uploads(dirpath: Path, items: list[tuple[str, bytes]]) -> list[Path]:
     return paths
 
 
-def sample_images() -> list[Path]:
+def sample_inputs() -> tuple[list[Path], list[Path]]:
+    videos = [sr.WORK / f"orig{k}.mp4" for k in range(1, SAMPLE_SLIDES + 1)]
     images = [sr.WORK / f"slide{k}.png" for k in range(1, SAMPLE_SLIDES + 1)]
-    if not all(p.exists() for p in images):
-        images = sr.make_sample_images(SAMPLE_SLIDES)
-    return images
+    if not all(p.exists() for p in videos + images):
+        videos, images = st.make_sample_originals(SAMPLE_SLIDES, ENCODER)
+    return videos, images
 
 
 # ---------------------------------------------------------------- 프로젝트
@@ -97,7 +102,7 @@ def load_project(pid: str | None) -> dict:
         raise ValueError("잘못된 프로젝트 id")
     f = JOBS / pid / "project.json"
     if not f.exists():
-        raise ValueError("프로젝트를 찾을 수 없습니다. 이미지를 다시 올려주세요")
+        raise ValueError("프로젝트를 찾을 수 없습니다. 영상을 다시 올려주세요")
     return json.loads(f.read_text(encoding="utf-8"))
 
 
@@ -107,109 +112,117 @@ def save_project(project: dict) -> None:
 
 
 def public_slide(s: dict) -> dict:
-    return {"index": s["index"], "name": s["name"], "duration": s["duration"], "thumb": s["thumb"],
-            "transition": s.get("transition"), "video": s.get("video_url")}
+    return {k: s.get(k) for k in ("index", "name", "duration", "fps", "width", "height", "has_audio", "thumb",
+                                  "image_name", "transition", "start", "verify")} | {"output": s.get("output_url")}
 
 
 def public_project(project: dict) -> dict:
-    return {"id": project["id"], "fps": project.get("fps", sr.FPS), "max_transition": sr.MAX_TRANSITION,
+    return {"id": project["id"], "encoder": ENCODER, "max_transition": sr.MAX_TRANSITION,
             "default_transition_duration": sr.DEFAULT_TRANSITION_DURATION,
             "slides": [public_slide(s) for s in project["slides"]]}
 
 
-def make_thumb(image: Path, out: Path) -> None:
-    sr.ffmpeg("-i", str(image), "-vf", "scale=320:-2", "-frames:v", "1", str(out))
+def make_thumb(video: Path, out: Path) -> None:
+    sr.ffmpeg("-i", str(video), "-frames:v", "1", "-vf", "scale=320:-2", str(out))
 
 
 def create_project(fields: dict[str, list[str]], files: dict[str, list[tuple[str, bytes]]]) -> dict:
     job = new_project_dir()
-    default_dur = float(field(fields, "duration", str(DEFAULT_SLIDE_DURATION)))
-    if default_dur <= 0:
-        raise ValueError("슬라이드 길이는 0보다 커야 합니다")
-    fps = int(field(fields, "fps", str(sr.FPS)))
-    if fps not in (24, 25, 30, 50, 60):
-        raise ValueError("프레임레이트는 24 / 25 / 30 / 50 / 60 중 하나")
     if field(fields, "use_sample", "0") == "1":
-        images = sample_images()
-        durations = list(sr.SAMPLE_DURATIONS)
+        videos, images = sample_inputs()
     else:
+        video_files = files.get("videos", [])
+        if len(video_files) < 1:
+            raise ValueError("슬라이드 영상을 1개 이상 올려주세요")
+        videos = save_uploads(job / "video", video_files)
         image_files = files.get("images", [])
-        if len(image_files) < 2:
-            raise ValueError("슬라이드 이미지를 2장 이상 올려주세요")
-        images = save_uploads(job / "img", image_files)
-        durations = [default_dur] * len(images)
+        images = save_uploads(job / "img", image_files) if image_files else []
+        if images and len(images) not in (len(videos), len(videos) - 1):
+            raise ValueError("이미지 개수는 영상 개수와 같거나 하나 적어야 합니다 (마지막 슬라이드 이미지는 쓰이지 않음)")
 
     (job / "thumbs").mkdir()
     slides = []
-    for i, image in enumerate(images, start=1):
-        make_thumb(image, job / "thumbs" / f"{i}.jpg")
-        slides.append({"index": i, "name": image.name, "image": str(image),
+    for i, video in enumerate(videos, start=1):
+        info = st.probe(video)
+        make_thumb(video, job / "thumbs" / f"{i}.jpg")
+        image = images[i - 1] if i - 1 < len(images) else None
+        slides.append({"index": i, "name": video.name, "video": str(video),
+                       "image": str(image) if image else None, "image_name": image.name if image else None,
+                       "duration": info.duration, "fps": st.fps_str(info.fps), "width": info.width,
+                       "height": info.height, "has_audio": info.has_audio,
                        "thumb": f"/jobs/{job.name}/thumbs/{i}.jpg",
-                       "duration": sr.snap(durations[i - 1], fps), "transition": None,
-                       "video": None, "video_url": None})
-    project = {"id": job.name, "fps": fps, "slides": slides}
+                       "transition": None, "start": "black", "output": None, "output_url": None, "verify": None})
+    project = {"id": job.name, "slides": slides}
     save_project(project)
     return {"ok": True, "project": public_project(project)}
 
 
-# ---------------------------------------------------------------- 렌더링
-def render_slide_job(body: dict) -> dict:
-    """슬라이드 k 영상 하나만 만든다. 전환이 있으면 k-1 번 이미지를 가져와 처음 T초에 넣는다."""
+# ---------------------------------------------------------------- 전환 붙이기
+def apply_job(body: dict) -> dict:
     proj = load_project(body.get("project"))
     slides = proj["slides"]
     k = int(body.get("slide") or 0)
     if not 1 <= k <= len(slides):
         raise ValueError("슬라이드 번호가 잘못됐습니다")
     s = slides[k - 1]
-    duration = float(body.get("duration") or s["duration"])
 
     t = body.get("transition") if isinstance(body.get("transition"), dict) else {}
     ttype = str(t.get("type") or "none")
+    if ttype == "none":                                  # 전환 해제: 원본 그대로
+        s["transition"], s["output"], s["output_url"], s["verify"] = None, None, None, None
+        save_project(proj)
+        return {"ok": True, "video": None, "report": ["전환 없음. 원본 영상을 그대로 씁니다."], "verify": None,
+                "command": "", "slide": public_slide(s)}
+    if ttype not in sr.PRESETS and ttype not in XFADE_ALL:
+        raise ValueError(f"알 수 없는 전환: {ttype}")
+    _, def_dur, def_ease, label = sr.resolve_transition(ttype)
+    tdur = float(t.get("duration") or def_dur)
+    easing = str(t.get("easing") or def_ease)
+
     if k == 1:
-        ttype = "none"                   # 첫 슬라이드는 앞 슬라이드가 없다
-    tdur, easing, label = 0.0, "none", ""
-    if ttype != "none":
-        if ttype not in sr.PRESETS and ttype not in XFADE_ALL:
-            raise ValueError(f"알 수 없는 전환: {ttype}")
-        _, def_dur, def_ease, label = sr.resolve_transition(ttype)
-        tdur = float(t.get("duration") or def_dur)
-        easing = str(t.get("easing") or def_ease)
-        if easing not in sr.EASINGS:
-            raise ValueError("움직임(easing)은 inout / out / none 중 하나")
-    prev = Path(slides[k - 2]["image"]) if ttype != "none" else None
+        prev = str(body.get("start") or s.get("start") or "black")
+        if prev not in st.START_COLORS:
+            raise ValueError("첫 슬라이드의 시작 화면은 black / white 중 하나")
+        s["start"] = prev
+    else:
+        prev = slides[k - 2].get("image")
+        if not prev:
+            raise ValueError(f"{k - 1}번 슬라이드 이미지가 없습니다. 앞 슬라이드 이미지를 함께 올려주세요")
 
-    fps = int(proj.get("fps", sr.FPS))
-    out = JOBS / proj["id"] / f"slide{k}_{uuid.uuid4().hex[:6]}.mp4"
-    cmd = sr.render_slide(Path(s["image"]), duration, out, prev, ttype, tdur, easing, fps)
-    rep = sr.report_slide(out, duration, ttype, tdur, easing, fps)
+    out = JOBS / proj["id"] / f"slide{k}_t_{uuid.uuid4().hex[:6]}.mp4"
+    cmd, info = st.apply(Path(s["video"]), prev, ttype, out, tdur, easing, ENCODER)
+    rep = st.report(info, out, ttype, tdur, easing, prev)
+    ver = st.verify(Path(s["video"]), out)
 
-    s["duration"] = sr.snap(duration, fps)
-    s["transition"] = ({"type": ttype, "duration": sr.snap(tdur, fps), "easing": easing, "label": label}
-                       if ttype != "none" else None)
-    s["video"] = str(out)
-    s["video_url"] = f"/jobs/{proj['id']}/{out.name}"
+    s["transition"] = {"type": ttype, "duration": st.snap(tdur, info.fps), "easing": easing, "label": label}
+    s["output"] = str(out)
+    s["output_url"] = f"/jobs/{proj['id']}/{out.name}"
+    s["verify"] = ver
     save_project(proj)
-    return {"ok": True, "video": s["video_url"], "report": rep, "command": sr.command_text(cmd),
-            "slide": public_slide(s)}
+    return {"ok": True, "video": s["output_url"], "report": rep["lines"], "verify": ver,
+            "command": sr.command_text(cmd), "slide": public_slide(s)}
 
 
 def concat_job(body: dict) -> dict:
-    """만들어 둔 슬라이드 영상들을 순서대로, 재인코딩 없이 이어 붙인다."""
+    """전환본이 있으면 전환본, 없으면 원본을 순서대로 이어 붙인다 (확인용, 재인코딩)."""
     proj = load_project(body.get("project"))
-    slides = proj["slides"]
-    missing = [str(s["index"]) for s in slides if not s.get("video")]
-    if missing:
-        raise ValueError("아직 영상을 만들지 않은 슬라이드가 있습니다: " + ", ".join(missing) + "번")
-    videos = [Path(s["video"]) for s in slides]
+    videos = [Path(s["output"] or s["video"]) for s in proj["slides"]]
     out = JOBS / proj["id"] / f"all_{uuid.uuid4().hex[:6]}.mp4"
-    cmd = sr.concat_videos(videos, out)
-    rep = sr.report_concat(videos, out)
-    return {"ok": True, "video": f"/jobs/{proj['id']}/{out.name}", "report": rep, "command": sr.command_text(cmd)}
+    cmd = st.concat(videos, out, ENCODER)
+    expected = sum(st.probe(v).duration for v in videos)
+    actual = st.probe(out).duration
+    lines = [f"슬라이드 합계 {expected:.3f}s / 출력 {actual:.3f}s (확인용 재인코딩, 오디오는 AAC 로 다시 인코딩)"]
+    t = 0.0
+    for s, v in zip(proj["slides"], videos):
+        d = st.probe(v).duration
+        lines.append(f"  {t:7.3f}s  {s['index']}번 {v.name} ({d:.3f}s){' 전환본' if s['output'] else ' 원본'}")
+        t += d
+    return {"ok": True, "video": f"/jobs/{proj['id']}/{out.name}", "report": lines, "command": sr.command_text(cmd)}
 
 
 # ---------------------------------------------------------------- HTTP
 class Handler(BaseHTTPRequestHandler):
-    server_version = "slide-render-demo/1.0"
+    server_version = "slide-transition-demo/3.0"
 
     def do_GET(self) -> None:
         path = unquote(urlsplit(self.path).path)
@@ -217,10 +230,12 @@ class Handler(BaseHTTPRequestHandler):
             return self._send_file(WEB_DIR / "index.html", "text/html; charset=utf-8")
         if path == "/api/transitions":
             return self._send_json({
+                "encoder": ENCODER,
                 "presets": [{"key": k, "label": v[0], "xfade": v[1], "duration": v[2], "easing": v[3]}
                             for k, v in sr.PRESETS.items()],
                 "easings": sr.EASINGS, "linear_raw": sorted(sr.LINEAR_RAW),
-                "default_duration": sr.DEFAULT_TRANSITION_DURATION, "all": XFADE_ALL})
+                "default_duration": sr.DEFAULT_TRANSITION_DURATION, "all": XFADE_ALL,
+                "start_colors": st.START_COLORS})
         if path.startswith("/jobs/"):
             target = (JOBS / path[len("/jobs/"):]).resolve()
             if target.is_file() and JOBS.resolve() in target.parents:
@@ -236,9 +251,9 @@ class Handler(BaseHTTPRequestHandler):
             if path == "/api/upload":
                 fields, files = parse_multipart(ctype, body)
                 result = create_project(fields, files)
-            elif path in ("/api/render_slide", "/api/concat"):
+            elif path in ("/api/apply", "/api/concat"):
                 data = json.loads(body.decode("utf-8") or "{}")
-                result = render_slide_job(data) if path == "/api/render_slide" else concat_job(data)
+                result = apply_job(data) if path == "/api/apply" else concat_job(data)
             else:
                 return self.send_error(404)
             self._send_json(result)
@@ -290,7 +305,7 @@ def main() -> None:
     args = ap.parse_args()
     JOBS.mkdir(exist_ok=True)
     server = ThreadingHTTPServer((args.host, args.port), Handler)
-    print(f"브라우저에서 열기: http://{args.host}:{args.port}   (종료: Ctrl+C)", flush=True)
+    print(f"브라우저에서 열기: http://{args.host}:{args.port}   (종료: Ctrl+C)   인코더: {ENCODER}", flush=True)
     print("이 주소로 열어야 /api/... 요청이 이 서버로 옵니다. 다른 서버(Live Server, http.server 등)로 열면 API 가 동작하지 않습니다.", flush=True)
     try:
         server.serve_forever()
