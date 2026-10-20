@@ -5,10 +5,11 @@
   python3 web.py --port 9000
 
 흐름
-  1. 슬라이드 영상(음성 포함)들과 슬라이드 이미지들을 올리거나 "샘플 4장으로 시작"          POST /api/upload
-  2. 왼쪽 목록에서 슬라이드를 고르고 들어올 때 전환(종류/길이/움직임)을 정한 뒤 "전환본 만들기".
-     k 번 영상의 처음 T초가 "k-1 번 이미지 -> k 번 영상" 전환으로 바뀐다. 첫 슬라이드는 검정/흰색 화면에서.
-     결과가 원본과 해상도/fps/프레임 수/길이/음성이 같은지 자동으로 검사한다                  POST /api/apply
+  1. 슬라이드 영상(음성 포함)들을 올리거나 "샘플 4장으로 체험"                                POST /api/upload
+  2. 왼쪽 목록에서 슬라이드를 고르고, 들어올 때 앞에 둘 그림(검정/흰색/이미지)과 전환(종류/길이/움직임)을
+     정한 뒤 "전환본 만들기". 앞에 둘 이미지는 슬라이드마다 패널에서 올린다                     POST /api/slide_image
+     k 번 영상의 처음 T초가 "앞 그림 -> k 번 영상" 전환으로 바뀌고, 결과가 원본과
+     해상도/fps/프레임 수/길이/음성이 같은지 자동으로 검사한다                                 POST /api/apply
   3. 전환본(없으면 원본)을 순서대로 이어 붙여 전체를 확인 (확인용, 재인코딩)                    POST /api/concat
 업로드, 썸네일, 전환본, 이어 붙인 영상은 jobs/<프로젝트 id>/ 아래에 남는다.
 """
@@ -113,7 +114,7 @@ def save_project(project: dict) -> None:
 
 def public_slide(s: dict) -> dict:
     return {k: s.get(k) for k in ("index", "name", "duration", "fps", "width", "height", "has_audio", "thumb",
-                                  "image_name", "transition", "start", "verify")} | {"output": s.get("output_url")}
+                                  "source", "prev_image_name", "prev_thumb", "transition", "verify")} | {"output": s.get("output_url")}
 
 
 def public_project(project: dict) -> dict:
@@ -126,35 +127,66 @@ def make_thumb(video: Path, out: Path) -> None:
     sr.ffmpeg("-i", str(video), "-frames:v", "1", "-vf", "scale=320:-2", str(out))
 
 
+def attach_prev_image(job: Path, s: dict, image: Path, display_name: str | None = None) -> None:
+    """슬라이드 s 에 '들어올 때 앞에 둘 이미지' 를 붙인다 (썸네일 포함). 화면에는 원래 파일 이름을 보여준다."""
+    thumb = job / "thumbs" / f"prev{s['index']}_{uuid.uuid4().hex[:4]}.jpg"
+    make_thumb(image, thumb)
+    s["prev_image"] = str(image)
+    s["prev_image_name"] = display_name or image.name
+    s["prev_thumb"] = f"/jobs/{job.name}/thumbs/{thumb.name}"
+    s["source"] = "image"
+
+
 def create_project(fields: dict[str, list[str]], files: dict[str, list[tuple[str, bytes]]]) -> dict:
     job = new_project_dir()
-    if field(fields, "use_sample", "0") == "1":
-        videos, images = sample_inputs()
+    sample = field(fields, "use_sample", "0") == "1"
+    if sample:
+        videos, sample_images = sample_inputs()
     else:
         video_files = files.get("videos", [])
         if len(video_files) < 1:
             raise ValueError("슬라이드 영상을 1개 이상 올려주세요")
         videos = save_uploads(job / "video", video_files)
-        image_files = files.get("images", [])
-        images = save_uploads(job / "img", image_files) if image_files else []
-        if images and len(images) not in (len(videos), len(videos) - 1):
-            raise ValueError("이미지 개수는 영상 개수와 같거나 하나 적어야 합니다 (마지막 슬라이드 이미지는 쓰이지 않음)")
+        sample_images = []
 
     (job / "thumbs").mkdir()
     slides = []
     for i, video in enumerate(videos, start=1):
         info = st.probe(video)
         make_thumb(video, job / "thumbs" / f"{i}.jpg")
-        image = images[i - 1] if i - 1 < len(images) else None
-        slides.append({"index": i, "name": video.name, "video": str(video),
-                       "image": str(image) if image else None, "image_name": image.name if image else None,
-                       "duration": info.duration, "fps": st.fps_str(info.fps), "width": info.width,
-                       "height": info.height, "has_audio": info.has_audio,
-                       "thumb": f"/jobs/{job.name}/thumbs/{i}.jpg",
-                       "transition": None, "start": "black", "output": None, "output_url": None, "verify": None})
+        s = {"index": i, "name": video.name, "video": str(video),
+             "duration": info.duration, "fps": st.fps_str(info.fps), "width": info.width,
+             "height": info.height, "has_audio": info.has_audio,
+             "thumb": f"/jobs/{job.name}/thumbs/{i}.jpg",
+             "source": "black" if i == 1 else "image",      # 1번은 검정 화면에서, 나머지는 앞 이미지에서
+             "prev_image": None, "prev_image_name": None, "prev_thumb": None,
+             "transition": None, "output": None, "output_url": None, "verify": None}
+        if sample and i >= 2:                                 # 샘플은 앞 슬라이드 이미지를 미리 붙여 둔다
+            attach_prev_image(job, s, sample_images[i - 2])
+        slides.append(s)
     project = {"id": job.name, "slides": slides}
     save_project(project)
     return {"ok": True, "project": public_project(project)}
+
+
+def slide_image_job(fields: dict[str, list[str]], files: dict[str, list[tuple[str, bytes]]]) -> dict:
+    """슬라이드 k 에 들어올 때 앞에 둘 이미지를 올린다."""
+    proj = load_project(field(fields, "project", ""))
+    k = int(field(fields, "slide", "0"))
+    if not 1 <= k <= len(proj["slides"]):
+        raise ValueError("슬라이드 번호가 잘못됐습니다")
+    items = files.get("image", [])
+    if not items:
+        raise ValueError("이미지 파일이 없습니다")
+    name, data = items[0]
+    job = JOBS / proj["id"]
+    (job / "img").mkdir(exist_ok=True)
+    image = job / "img" / f"slide{k}_prev_{uuid.uuid4().hex[:4]}_{name}"
+    image.write_bytes(data)
+    s = proj["slides"][k - 1]
+    attach_prev_image(job, s, image, display_name=name)
+    save_project(proj)
+    return {"ok": True, "slide": public_slide(s)}
 
 
 # ---------------------------------------------------------------- 전환 붙이기
@@ -179,15 +211,16 @@ def apply_job(body: dict) -> dict:
     tdur = float(t.get("duration") or def_dur)
     easing = str(t.get("easing") or def_ease)
 
-    if k == 1:
-        prev = str(body.get("start") or s.get("start") or "black")
-        if prev not in st.START_COLORS:
-            raise ValueError("첫 슬라이드의 시작 화면은 black / white 중 하나")
-        s["start"] = prev
-    else:
-        prev = slides[k - 2].get("image")
+    source = str(body.get("source") or s.get("source") or ("black" if k == 1 else "image"))
+    if source in st.START_COLORS:
+        prev = source
+    elif source == "image":
+        prev = s.get("prev_image")
         if not prev:
-            raise ValueError(f"{k - 1}번 슬라이드 이미지가 없습니다. 앞 슬라이드 이미지를 함께 올려주세요")
+            raise ValueError("앞에 둘 이미지를 먼저 올려주세요 (패널의 '이미지' 에서 선택)")
+    else:
+        raise ValueError("앞에 둘 그림은 black / white / image 중 하나")
+    s["source"] = source
 
     out = JOBS / proj["id"] / f"slide{k}_t_{uuid.uuid4().hex[:6]}.mp4"
     cmd, info = st.apply(Path(s["video"]), prev, ttype, out, tdur, easing, ENCODER)
@@ -222,7 +255,7 @@ def concat_job(body: dict) -> dict:
 
 # ---------------------------------------------------------------- HTTP
 class Handler(BaseHTTPRequestHandler):
-    server_version = "slide-transition-demo/3.0"
+    server_version = "slide-transition-demo/3.1"
 
     def do_GET(self) -> None:
         path = unquote(urlsplit(self.path).path)
@@ -248,9 +281,9 @@ class Handler(BaseHTTPRequestHandler):
         body = self.rfile.read(int(self.headers.get("Content-Length") or 0))
         ctype = self.headers.get("Content-Type", "")
         try:
-            if path == "/api/upload":
+            if path in ("/api/upload", "/api/slide_image"):
                 fields, files = parse_multipart(ctype, body)
-                result = create_project(fields, files)
+                result = create_project(fields, files) if path == "/api/upload" else slide_image_job(fields, files)
             elif path in ("/api/apply", "/api/concat"):
                 data = json.loads(body.decode("utf-8") or "{}")
                 result = apply_job(data) if path == "/api/apply" else concat_job(data)

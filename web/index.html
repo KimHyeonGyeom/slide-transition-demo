@@ -3,101 +3,159 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>슬라이드 영상 전환 테스트</title>
+<title>슬라이드 영상 전환</title>
 <style>
-  :root { --bg:#f6f7f9; --card:#fff; --line:#dde1e6; --text:#1f2933; --muted:#6b7280;
-          --accent:#2563eb; --ok:#059669; --err:#dc2626; }
+  :root { --bg:#f3f4f6; --card:#fff; --line:#e5e7eb; --line2:#d1d5db; --text:#111827; --muted:#6b7280;
+          --accent:#2563eb; --accent2:#1d4ed8; --soft:#eff6ff; --ok:#059669; --okbg:#ecfdf5; --err:#dc2626; --errbg:#fef2f2; --warnbg:#fffbeb; --warn:#b45309; }
   * { box-sizing: border-box; }
   body { margin:0; background:var(--bg); color:var(--text); line-height:1.5;
          font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans KR", "Malgun Gothic", sans-serif; }
-  main { max-width: 1060px; margin: 0 auto; padding: 24px 16px 64px; }
-  h1 { font-size: 1.5rem; margin: 0 0 4px; }
-  h2 { font-size: 1.1rem; margin: 0 0 8px; }
-  h2 small { font-weight:400; color:var(--muted); font-size:.85rem; margin-left:6px; }
-  .lead, .muted { color: var(--muted); margin: 0 0 20px; }
-  fieldset { border:1px solid var(--line); background:var(--card); border-radius:10px; padding:16px; margin:0 0 16px; }
-  legend { font-weight:600; padding:0 6px; }
-  label { display:block; margin:10px 0 4px; font-weight:500; }
-  small, .files { color: var(--muted); font-size:.9rem; }
-  select, input[type=number] { font: inherit; padding:6px 8px; border:1px solid var(--line); border-radius:6px; }
-  input[type=number] { width: 9em; }
-  .row { display:flex; gap:16px; flex-wrap:wrap; align-items:center; }
-  button { font: inherit; padding:10px 18px; border-radius:8px; border:1px solid var(--accent);
-           background:var(--accent); color:#fff; cursor:pointer; }
+  main { max-width: 1120px; margin: 0 auto; padding: 24px 16px 72px; }
+  h1 { font-size: 1.45rem; margin: 0; }
+  h2 { font-size: 1.05rem; margin: 0 0 12px; }
+  h3 { font-size: 1rem; margin: 0 0 10px; }
+  h3 small, h2 small { font-weight:400; color:var(--muted); font-size:.85rem; margin-left:8px; }
+  h4 { font-size:.8rem; letter-spacing:.04em; text-transform:uppercase; color:var(--muted); margin:0 0 8px; }
+  p.lead { color: var(--muted); margin: 6px 0 16px; }
+  .hint { color: var(--muted); font-size:.88rem; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:18px 20px; margin:0 0 16px; box-shadow:0 1px 2px rgba(0,0,0,.04); }
+  .steps { display:flex; gap:8px; list-style:none; padding:0; margin:14px 0 18px; flex-wrap:wrap; }
+  .steps li { flex:1; min-width:180px; display:flex; gap:10px; align-items:center; padding:10px 12px; border-radius:10px; border:1px solid var(--line); background:var(--card); color:var(--muted); font-size:.9rem; }
+  .steps li .n { width:26px; height:26px; border-radius:50%; background:var(--line); color:var(--muted); display:flex; align-items:center; justify-content:center; font-weight:700; font-size:.85rem; flex:none; }
+  .steps li.active { border-color:var(--accent); color:var(--text); background:var(--soft); }
+  .steps li.active .n { background:var(--accent); color:#fff; }
+  .steps li.done .n { background:var(--ok); color:#fff; }
+  .row { display:flex; gap:12px; flex-wrap:wrap; align-items:center; }
+  .row.between { justify-content:space-between; }
+  button { font: inherit; font-weight:500; padding:9px 16px; border-radius:8px; border:1px solid var(--accent); background:var(--accent); color:#fff; cursor:pointer; transition: background .15s; }
+  button:hover { background:var(--accent2); }
   button.secondary { background:#fff; color:var(--accent); }
+  button.secondary:hover { background:var(--soft); }
+  button.ghost { background:transparent; border-color:var(--line2); color:var(--text); padding:6px 10px; font-size:.88rem; }
+  button.ghost:hover { background:#f9fafb; }
   button:disabled { opacity:.5; cursor:default; }
-  .status { margin:12px 0; min-height:1.5em; font-weight:500; white-space: pre-line; }
+  .status { min-height:1.4em; font-weight:500; font-size:.92rem; white-space:pre-line; }
   .status.err { color: var(--err); }
   .status.ok { color: var(--ok); }
-  .banner { background:#fef2f2; border:1px solid #fecaca; color:#991b1b; border-radius:8px; padding:10px 14px; margin:0 0 16px; white-space: pre-line; }
-  .grid { display:grid; grid-template-columns: 330px 1fr; gap:16px; align-items:start; }
-  @media (max-width: 760px) { .grid { grid-template-columns: 1fr; } }
-  .list { list-style:none; margin:0; padding:0; border:1px solid var(--line); border-radius:10px; background:var(--card); overflow:hidden; }
-  .list li { display:flex; gap:10px; align-items:center; padding:8px 10px; border-bottom:1px solid var(--line); cursor:pointer; }
+  .banner { background:var(--errbg); border:1px solid #fecaca; color:#991b1b; border-radius:10px; padding:10px 14px; margin:0 0 16px; white-space:pre-line; }
+  .dropzone { border:2px dashed var(--line2); border-radius:12px; padding:26px 16px; text-align:center; color:var(--muted); cursor:pointer; transition: all .15s; background:#fafafa; }
+  .dropzone:hover, .dropzone.over { border-color:var(--accent); background:var(--soft); color:var(--accent); }
+  .dropzone b { color:var(--text); }
+  .dropzone.small { padding:14px; font-size:.9rem; }
+  .filelist { margin:10px 0 0; font-size:.9rem; color:var(--muted); display:flex; gap:6px; flex-wrap:wrap; }
+  .filelist span { background:#f3f4f6; border-radius:6px; padding:2px 8px; }
+  .bar { display:flex; gap:12px; align-items:center; justify-content:space-between; flex-wrap:wrap; background:var(--card); border:1px solid var(--line); border-radius:12px; padding:10px 16px; margin:0 0 16px; font-size:.92rem; }
+  .bar b { font-weight:600; }
+  .grid { display:grid; grid-template-columns: 340px 1fr; gap:16px; align-items:start; }
+  @media (max-width: 800px) { .grid { grid-template-columns: 1fr; } }
+  .list { list-style:none; margin:0; padding:0; border:1px solid var(--line); border-radius:12px; background:var(--card); overflow:hidden; }
+  .list li { display:flex; gap:10px; align-items:flex-start; padding:10px; border-bottom:1px solid var(--line); cursor:pointer; transition: background .1s; }
   .list li:last-child { border-bottom:0; }
-  .list li:hover { background:#f8fafc; }
-  .list li.selected { background:#eef2ff; box-shadow: inset 3px 0 0 var(--accent); }
-  .list img { width:96px; aspect-ratio:16/9; object-fit:cover; border-radius:4px; background:#000; flex:none; }
+  .list li:hover { background:#f9fafb; }
+  .list li.selected { background:var(--soft); box-shadow: inset 3px 0 0 var(--accent); }
+  .list img { width:100px; aspect-ratio:16/9; object-fit:cover; border-radius:6px; background:#000; flex:none; }
   .list .meta { flex:1; min-width:0; }
-  .list .name { font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-  .list .sub { font-size:.85rem; color:var(--muted); }
-  .badge { display:inline-block; font-size:.75rem; padding:1px 7px; border-radius:999px; background:#fef3c7; color:#92400e; margin:2px 6px 0 0; }
+  .list .name { font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-size:.95rem; }
+  .list .sub { font-size:.8rem; color:var(--muted); }
+  .badges { display:flex; flex-wrap:wrap; gap:4px; margin-top:4px; }
+  .badge { display:inline-block; font-size:.72rem; padding:1px 7px; border-radius:999px; background:#fef3c7; color:#92400e; }
   .badge.plain { background:#e5e7eb; color:#374151; }
-  .badge.done { background:#d1fae5; color:#065f46; }
-  .badge.warn { background:#fee2e2; color:#991b1b; }
-  .panel { border:1px solid var(--line); border-radius:10px; background:var(--card); padding:16px; }
-  .note { background:#f0f9ff; border:1px solid #bae6fd; border-radius:8px; padding:8px 12px; font-size:.9rem; margin:12px 0; }
+  .badge.done { background:var(--okbg); color:#065f46; }
+  .badge.warn { background:var(--errbg); color:#991b1b; }
+  .badge.src { background:#e0e7ff; color:#3730a3; }
+  .panel { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:18px 20px; }
+  .block { padding:12px 0; border-top:1px solid var(--line); }
+  .block:first-of-type { border-top:0; padding-top:4px; }
+  .seg { display:inline-flex; border:1px solid var(--line2); border-radius:8px; overflow:hidden; }
+  .seg button { background:#fff; color:var(--text); border:0; border-right:1px solid var(--line2); border-radius:0; padding:7px 14px; font-weight:500; }
+  .seg button:last-child { border-right:0; }
+  .seg button.active { background:var(--accent); color:#fff; }
+  .seg button:hover:not(.active) { background:#f3f4f6; }
+  .imgpick { display:flex; gap:12px; align-items:center; margin-top:10px; }
+  .imgpick img { width:160px; aspect-ratio:16/9; object-fit:cover; border-radius:8px; border:1px solid var(--line); background:#000; }
+  .fields { display:grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap:12px; }
+  .fields label { display:block; font-size:.85rem; color:var(--muted); margin-bottom:4px; }
+  select, input[type=number] { font: inherit; padding:7px 9px; border:1px solid var(--line2); border-radius:8px; width:100%; background:#fff; }
+  .dur { display:flex; gap:8px; align-items:center; }
+  .dur input[type=range] { flex:1; }
+  .dur input[type=number] { width:5.5em; }
+  .note { background:var(--soft); border:1px solid #bfdbfe; border-radius:10px; padding:10px 12px; font-size:.9rem; margin:12px 0; }
   video { width:100%; background:#000; border-radius:10px; }
-  video.small { max-width:560px; margin-top:8px; }
-  .timeline { position:relative; height:56px; margin:16px 0 8px; border-radius:8px; overflow:hidden; background:#e5e7eb; }
-  .seg { position:absolute; top:0; bottom:0; display:flex; align-items:center; justify-content:center; font-size:.8rem; color:#fff; border-right:1px solid rgba(255,255,255,.6); overflow:hidden; white-space:nowrap; }
-  .tr { position:absolute; top:0; bottom:0; display:flex; align-items:flex-end; justify-content:center; font-size:.7rem; color:#000; overflow:hidden;
-        background:repeating-linear-gradient(45deg, rgba(250,204,21,.9) 0 6px, rgba(234,179,8,.9) 6px 12px); }
-  pre { background:#0f172a; color:#e2e8f0; padding:12px; border-radius:8px; overflow:auto; font-size:.85rem; }
-  pre.verify { background:#f8fafc; color:#1f2933; border:1px solid var(--line); }
-  a.dl { display:inline-block; margin:8px 0 12px; }
+  video.small { max-width:600px; margin-top:10px; }
+  table.verify { border-collapse:collapse; width:100%; max-width:600px; font-size:.86rem; margin-top:10px; }
+  table.verify td { padding:4px 8px; border-bottom:1px solid var(--line); }
+  table.verify td:first-child { color:var(--muted); width:9em; }
+  table.verify tr.ok td:last-child { color:var(--ok); } table.verify tr.bad td:last-child { color:var(--err); }
+  .timeline { position:relative; height:52px; margin:12px 0; border-radius:10px; overflow:hidden; background:#e5e7eb; }
+  .seg-t { position:absolute; top:0; bottom:0; display:flex; align-items:center; justify-content:center; font-size:.8rem; color:#fff; border-right:1px solid rgba(255,255,255,.6); overflow:hidden; white-space:nowrap; }
+  .tr { position:absolute; top:0; bottom:0; display:flex; align-items:flex-end; justify-content:center; font-size:.68rem; color:#000; overflow:hidden; background:repeating-linear-gradient(45deg, rgba(250,204,21,.9) 0 6px, rgba(234,179,8,.9) 6px 12px); }
+  pre { background:#0f172a; color:#e2e8f0; padding:12px; border-radius:10px; overflow:auto; font-size:.82rem; }
+  a.dl { display:inline-block; margin:8px 12px 8px 0; font-weight:500; }
+  .outputs { display:grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap:10px; }
+  .outputs .o { border:1px solid var(--line); border-radius:10px; padding:10px 12px; font-size:.9rem; background:var(--card); }
+  .outputs .o .t { font-weight:600; margin-bottom:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  details summary { cursor:pointer; color:var(--muted); font-size:.9rem; margin-top:8px; }
+  .spin::after { content:""; display:inline-block; width:12px; height:12px; margin-left:8px; border:2px solid rgba(255,255,255,.5); border-top-color:#fff; border-radius:50%; animation: sp .8s linear infinite; vertical-align:-2px; }
+  @keyframes sp { to { transform: rotate(360deg); } }
 </style>
 </head>
 <body>
 <main>
   <div class="banner" id="banner" hidden></div>
-  <h1>슬라이드 영상 전환 테스트</h1>
-  <p class="lead">이미 만들어 둔 슬라이드 영상(음성 포함)에 "들어올 때 전환"을 붙입니다. 영상의 처음 T초가 앞 슬라이드 이미지에서 이 영상으로
-    바뀌는 전환이 되고, 해상도, fps, 프레임 수, 길이, 음성은 원본과 똑같이 유지됩니다. 첫 슬라이드는 검정(또는 흰색) 화면에서 들어옵니다.
-    <br><span id="apiStatus" class="files">API 서버 확인 중...</span></p>
+  <h1>슬라이드 영상 전환</h1>
+  <p class="lead">이미 만든 슬라이드 영상(음성 포함)에 "들어올 때 전환"을 붙입니다. 영상의 처음 T초만 전환이 되고, 해상도·fps·프레임 수·길이·음성은 원본과 똑같이 유지됩니다.
+    <br><span id="apiStatus" class="hint">API 서버 확인 중...</span></p>
+  <ol class="steps">
+    <li id="step1" class="active"><span class="n">1</span><span>슬라이드 영상 올리기</span></li>
+    <li id="step2"><span class="n">2</span><span>슬라이드마다 앞에 둘 그림과 전환 정하기</span></li>
+    <li id="step3"><span class="n">3</span><span>전환본 만들고 확인·내려받기</span></li>
+  </ol>
 
-  <fieldset>
-    <legend>1. 입력</legend>
-    <label for="videos">슬라이드 영상 (1개 이상, 파일 이름 순서)</label>
-    <input id="videos" type="file" multiple accept="video/mp4,video/*">
-    <div class="files" id="videoList"></div>
-    <label for="images">슬라이드 이미지 (영상과 같은 순서. k번 이미지는 k+1번 영상의 전환에 쓰입니다)</label>
-    <input id="images" type="file" multiple accept="image/*">
-    <div class="files">영상 개수와 같거나 하나 적게 올립니다. 이미지가 없는 슬라이드의 다음 슬라이드에는 전환을 넣을 수 없습니다.</div>
-    <div class="row" style="margin-top:12px">
+  <section class="card" id="inputSection">
+    <h2>1. 슬라이드 영상 올리기</h2>
+    <div class="dropzone" id="videoDrop"><b>영상 파일을 끌어다 놓거나 클릭해서 선택</b><br>여러 개를 한 번에. 파일 이름 순서로 슬라이드가 됩니다.</div>
+    <input id="videos" type="file" multiple accept="video/mp4,video/*" hidden>
+    <div class="filelist" id="videoList"></div>
+    <div class="row" style="margin-top:14px">
       <button type="button" id="uploadBtn">프로젝트 만들기</button>
-      <button type="button" class="secondary" id="sampleBtn">샘플 4장으로 시작</button>
+      <button type="button" class="secondary" id="sampleBtn">샘플 4장으로 체험</button>
+      <span class="status" id="status"></span>
     </div>
-  </fieldset>
-  <div class="status" id="status"></div>
+    <p class="hint" style="margin:10px 0 0">앞 슬라이드 이미지는 다음 단계에서 슬라이드를 고른 뒤 패널에서 올립니다.</p>
+  </section>
+
+  <div class="bar" id="projectBar" hidden>
+    <div id="projectSummary"></div>
+    <button type="button" class="ghost" id="resetBtn">다른 영상으로 다시 시작</button>
+  </div>
 
   <section id="editor" hidden>
-    <h2>2. 슬라이드별 전환 <small>전환은 각 영상의 맨 앞, 원본과 동일 규격</small></h2>
     <div class="grid">
-      <ul class="list" id="slideList"></ul>
+      <aside>
+        <ul class="list" id="slideList"></ul>
+        <div class="row" style="margin-top:10px">
+          <button type="button" class="secondary" id="renderAllBtn">전환이 설정된 슬라이드 모두 만들기</button>
+        </div>
+        <div class="status" id="allStatus" style="margin-top:8px"></div>
+      </aside>
       <div class="panel" id="panel"></div>
     </div>
-    <div class="timeline" id="timeline"></div>
-    <div class="row">
-      <button type="button" class="secondary" id="renderAllBtn">전환이 설정된 슬라이드 모두 만들기</button>
-      <button type="button" id="concatBtn">3. 이어 붙여 보기 (확인용)</button>
-      <span class="status" id="allStatus"></span>
-    </div>
-    <section id="result" hidden>
-      <video id="video" controls></video>
-      <pre id="report"></pre>
-      <a class="dl" id="download" download="all.mp4">이어 붙인 영상 다운로드</a>
-      <details><summary>실행한 ffmpeg 명령</summary><pre id="cmd"></pre></details>
+
+    <section class="card" style="margin-top:16px">
+      <h2>3. 확인과 내려받기 <small>전환본이 없는 슬라이드는 원본을 씁니다</small></h2>
+      <div class="timeline" id="timeline"></div>
+      <div class="row">
+        <button type="button" id="concatBtn">이어 붙여 보기 (확인용)</button>
+        <span class="status" id="concatStatus"></span>
+      </div>
+      <section id="result" hidden style="margin-top:12px">
+        <video id="video" controls></video>
+        <pre id="report"></pre>
+        <a class="dl" id="download" download="all.mp4">이어 붙인 영상 내려받기</a>
+        <details><summary>실행한 ffmpeg 명령</summary><pre id="cmd"></pre></details>
+      </section>
+      <h4 style="margin-top:16px">전환본 파일</h4>
+      <div class="outputs" id="outputs"></div>
     </section>
   </section>
 </main>
@@ -106,17 +164,18 @@
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const sortByName = (files) => [...files].sort((a, b) => a.name.localeCompare(b.name));
+const round1 = (x) => Math.round(x * 10) / 10;
 const SERVER_HINT = '이 페이지는 python3 web.py 로 띄운 서버에서 열어야 합니다. 주소창이 http://127.0.0.1:8000 (또는 --port 로 정한 포트) 인지, 서버 콘솔에 요청 로그가 찍히는지 확인하세요.';
 
-let TRANSITIONS = { presets: [], easings: {}, linear_raw: [], default_duration: 0.5, all: [], start_colors: {}, encoder: '' };
-let project = null;   // { id, encoder, slides: [{ index, name, duration, fps, width, height, has_audio, thumb, image_name, transition, start, output, verify }] }
+let T = { presets: [], easings: {}, linear_raw: [], default_duration: 0.5, all: [], start_colors: {}, encoder: '' };
+let project = null;   // { id, encoder, max_transition, slides: [{ index, name, duration, fps, width, height, has_audio, thumb, source, prev_image_name, prev_thumb, transition, output, verify }] }
 let selected = 1;
+let pendingVideos = [];
 
 function setStatus(el, msg, cls = '') { el.textContent = msg; el.className = 'status ' + cls; }
 function startAt(k) { let t = 0; for (let i = 0; i < k - 1; i++) t += project.slides[i].duration; return t; }
-const round1 = (x) => Math.round(x * 10) / 10;
+function setSteps(n) { [1, 2, 3].forEach(i => { const li = $('step' + i); li.className = i < n ? 'done' : (i === n ? 'active' : ''); }); }
 
-// fetch 응답을 JSON 으로 읽되, JSON 이 아니면 상태 코드와 본문 앞부분을 담은 오류를 낸다
 async function api(url, options) {
   let res;
   try { res = await fetch(url, options); }
@@ -129,27 +188,35 @@ const postJson = (url, body) => api(url, { method: 'POST', headers: { 'Content-T
 
 async function loadTransitions() {
   try {
-    TRANSITIONS = await api('/api/transitions');
-    $('apiStatus').textContent = `API 연결됨 · 인코더 ${TRANSITIONS.encoder} · 파워포인트 스타일 프리셋 ${TRANSITIONS.presets.length}종 + xfade 원본 ${TRANSITIONS.all.length}종`;
+    T = await api('/api/transitions');
+    $('apiStatus').textContent = `API 연결됨 · 인코더 ${T.encoder} · 파워포인트 스타일 프리셋 ${T.presets.length}종 + xfade 원본 ${T.all.length}종`;
   } catch (e) {
     $('apiStatus').textContent = 'API 서버에 연결되지 않았습니다.';
     const b = $('banner'); b.textContent = 'API 서버에 연결되지 않았습니다. ' + e.message; b.hidden = false;
   }
 }
 
-$('videos').addEventListener('change', () => {
-  $('videoList').textContent = sortByName($('videos').files).map((f, i) => `${i + 1}. ${f.name}`).join('   >   ');
-});
+// ---------------------------------------------------------------- 드롭존 공통
+function dropzone(el, input, onFiles) {
+  el.addEventListener('click', () => input.click());
+  el.addEventListener('dragover', e => { e.preventDefault(); el.classList.add('over'); });
+  el.addEventListener('dragleave', () => el.classList.remove('over'));
+  el.addEventListener('drop', e => { e.preventDefault(); el.classList.remove('over'); onFiles([...e.dataTransfer.files]); });
+  input.addEventListener('change', () => { onFiles([...input.files]); input.value = ''; });
+}
 
 // ---------------------------------------------------------------- 1. 프로젝트
+dropzone($('videoDrop'), $('videos'), files => {
+  pendingVideos = sortByName(files.filter(f => f.type.startsWith('video/') || /\.(mp4|mov|m4v|webm|mkv)$/i.test(f.name)));
+  $('videoList').innerHTML = pendingVideos.map((f, i) => `<span>${i + 1}. ${esc(f.name)}</span>`).join('');
+});
+
 async function createProject(useSample) {
   const fd = new FormData();
   fd.append('use_sample', useSample ? '1' : '0');
   if (!useSample) {
-    const videos = sortByName($('videos').files);
-    if (videos.length < 1) { setStatus($('status'), '슬라이드 영상을 1개 이상 선택해 주세요.', 'err'); return; }
-    videos.forEach(f => fd.append('videos', f, f.name));
-    sortByName($('images').files).forEach(f => fd.append('images', f, f.name));
+    if (pendingVideos.length < 1) { setStatus($('status'), '슬라이드 영상을 먼저 선택해 주세요.', 'err'); return; }
+    pendingVideos.forEach(f => fd.append('videos', f, f.name));
   }
   setStatus($('status'), useSample ? '샘플 영상을 만드는 중... (처음 한 번은 10초쯤 걸립니다)' : '올리는 중...');
   $('uploadBtn').disabled = $('sampleBtn').disabled = true;
@@ -157,11 +224,14 @@ async function createProject(useSample) {
     const data = await api('/api/upload', { method: 'POST', body: fd });
     if (!data.ok) { setStatus($('status'), '실패: ' + data.error, 'err'); return; }
     project = data.project; selected = 1;
+    setStatus($('status'), '');
     const total = project.slides.reduce((a, s) => a + s.duration, 0);
-    setStatus($('status'), `슬라이드 ${project.slides.length}장, 총 ${total.toFixed(2)}초. 왼쪽 목록에서 슬라이드를 골라 들어올 때 전환을 정하세요.`, 'ok');
-    $('editor').hidden = false; $('result').hidden = true; setStatus($('allStatus'), '');
-    renderList(); renderPanel(); drawTimeline();
-    $('editor').scrollIntoView({ behavior: 'smooth' });
+    const s0 = project.slides[0];
+    $('projectSummary').innerHTML = `<b>슬라이드 ${project.slides.length}장</b> · 총 ${total.toFixed(2)}초 · ${s0.width}x${s0.height} ${esc(s0.fps)}fps · 인코더 ${esc(project.encoder)}`;
+    $('inputSection').hidden = true; $('projectBar').hidden = false; $('editor').hidden = false; $('result').hidden = true;
+    setStatus($('allStatus'), ''); setStatus($('concatStatus'), '');
+    setSteps(2); renderList(); renderPanel(); drawTimeline(); renderOutputs();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   } catch (e) {
     setStatus($('status'), '요청 실패: ' + e.message, 'err');
   } finally {
@@ -169,8 +239,16 @@ async function createProject(useSample) {
   }
 }
 
-// ---------------------------------------------------------------- 2. 목록 / 패널
-function prevImageOf(k) { return k > 1 ? project.slides[k - 2].image_name : null; }
+$('resetBtn').addEventListener('click', () => {
+  project = null; pendingVideos = []; $('videoList').innerHTML = '';
+  $('inputSection').hidden = false; $('projectBar').hidden = true; $('editor').hidden = true; setSteps(1);
+});
+
+// ---------------------------------------------------------------- 2. 목록
+function sourceBadge(s) {
+  if (s.source === 'image') return s.prev_image_name ? `<span class="badge src">이미지: ${esc(s.prev_image_name)}</span>` : '<span class="badge warn">앞 이미지 없음</span>';
+  return `<span class="badge src">${esc(T.start_colors[s.source] || s.source)}</span>`;
+}
 
 function renderList() {
   const ul = $('slideList'); ul.innerHTML = '';
@@ -179,91 +257,142 @@ function renderList() {
     li.className = s.index === selected ? 'selected' : '';
     const t = s.transition;
     let badges = t ? `<span class="badge">${esc(t.label || t.type)} ${t.duration}s</span>` : '<span class="badge plain">원본 그대로</span>';
-    if (s.output) badges += `<span class="badge ${s.verify && s.verify.ok ? 'done' : 'warn'}">${s.verify && s.verify.ok ? '전환본 ✓ 동일' : '전환본 (규격 다름)'}</span>`;
-    if (s.index > 1 && !prevImageOf(s.index)) badges += '<span class="badge warn">앞 이미지 없음</span>';
+    if (t) badges += sourceBadge(s);
+    if (s.output) badges += `<span class="badge ${s.verify && s.verify.ok ? 'done' : 'warn'}">${s.verify && s.verify.ok ? '전환본 ✓ 원본과 동일' : '전환본 (규격 다름)'}</span>`;
     li.innerHTML = `<img src="${s.thumb}" alt="">
       <div class="meta"><div class="name">${s.index}. ${esc(s.name)}</div>
       <div class="sub">${s.duration.toFixed(2)}s · ${s.width}x${s.height} ${esc(s.fps)}fps${s.has_audio ? ' · 음성' : ''} · 시작 ${startAt(s.index).toFixed(2)}s</div>
-      <div>${badges}</div></div>`;
+      <div class="badges">${badges}</div></div>`;
     li.addEventListener('click', () => { selected = s.index; renderList(); renderPanel(); });
     ul.appendChild(li);
   });
 }
 
+document.addEventListener('keydown', e => {
+  if (!project || ['INPUT', 'SELECT', 'TEXTAREA'].includes(document.activeElement.tagName)) return;
+  if (e.key === 'ArrowDown' && selected < project.slides.length) { selected++; renderList(); renderPanel(); }
+  if (e.key === 'ArrowUp' && selected > 1) { selected--; renderList(); renderPanel(); }
+});
+
+// ---------------------------------------------------------------- 2. 패널
 function fillTransitionSelect(sel, current) {
   sel.innerHTML = '';
   sel.appendChild(new Option('없음 (원본 그대로)', 'none'));
   const g1 = document.createElement('optgroup'); g1.label = '파워포인트 스타일';
-  TRANSITIONS.presets.forEach(p => g1.appendChild(new Option(p.label, p.key)));
-  const keys = new Set(TRANSITIONS.presets.map(p => p.key));
+  T.presets.forEach(p => g1.appendChild(new Option(p.label, p.key)));
+  const keys = new Set(T.presets.map(p => p.key));
   const g2 = document.createElement('optgroup'); g2.label = 'ffmpeg xfade 원본';
-  TRANSITIONS.all.filter(n => !keys.has(n)).forEach(n => g2.appendChild(new Option(n, n)));
-  sel.append(g1, g2);
-  sel.value = current;
+  T.all.filter(n => !keys.has(n)).forEach(n => g2.appendChild(new Option(n, n)));
+  sel.append(g1, g2); sel.value = current;
 }
 function fillEasingSelect(sel, current) {
   sel.innerHTML = '';
-  Object.entries(TRANSITIONS.easings).forEach(([k, v]) => sel.appendChild(new Option(v, k)));
+  Object.entries(T.easings).forEach(([k, v]) => sel.appendChild(new Option(v, k)));
   sel.value = current;
 }
 function transitionDefaults(type) {
-  const p = TRANSITIONS.presets.find(p => p.key === type);
+  const p = T.presets.find(p => p.key === type);
   if (p) return { duration: p.duration, easing: p.easing };
-  return { duration: TRANSITIONS.default_duration, easing: TRANSITIONS.linear_raw.includes(type) ? 'none' : 'inout' };
+  return { duration: T.default_duration, easing: T.linear_raw.includes(type) ? 'none' : 'inout' };
 }
-function labelOf(type) { const p = TRANSITIONS.presets.find(p => p.key === type); return p ? p.label : type; }
+function labelOf(type) { const p = T.presets.find(p => p.key === type); return p ? p.label : type; }
 
 function renderPanel() {
   const p = $('panel');
   const s = project.slides[selected - 1];
-  const t = s.transition || { type: 'none', duration: TRANSITIONS.default_duration, easing: 'inout' };
-  const startUI = selected === 1 ? `
-      <div><label for="pstart">시작 화면</label><select id="pstart"></select></div>` : '';
+  const t = s.transition || { type: 'none', duration: T.default_duration, easing: 'inout' };
+  const segBtn = (v, label) => `<button type="button" data-src="${v}" class="${s.source === v ? 'active' : ''}">${label}</button>`;
   p.innerHTML = `
-    <h2>${selected}번 슬라이드 <small>${esc(s.name)} · ${s.duration.toFixed(2)}s · ${s.width}x${s.height} ${esc(s.fps)}fps</small></h2>
-    <div class="row">
-      ${startUI}
-      <div><label for="ptype">들어올 때 전환</label><select id="ptype"></select></div>
-      <div><label for="pdur">전환 길이 (초, 최대 ${project.max_transition})</label>
-        <input id="pdur" type="number" min="0.1" max="${project.max_transition}" step="0.1" value="${t.duration}"></div>
-      <div><label for="pease">움직임</label><select id="pease"></select></div>
+    <h3>${selected}번 슬라이드 <small>${esc(s.name)} · ${s.duration.toFixed(2)}s · ${s.width}x${s.height} ${esc(s.fps)}fps${s.has_audio ? ' · 음성 있음' : ''}</small></h3>
+    <div class="block">
+      <h4>들어올 때 앞에 둘 그림</h4>
+      <div class="seg" id="srcSeg">${segBtn('black', '검정 화면')}${segBtn('white', '흰색 화면')}${segBtn('image', '이미지 (앞 슬라이드)')}</div>
+      <div id="imageArea"></div>
+      <input id="prevImage" type="file" accept="image/*" hidden>
+    </div>
+    <div class="block">
+      <h4>전환 효과</h4>
+      <div class="fields">
+        <div><label for="ptype">종류</label><select id="ptype"></select></div>
+        <div><label for="pdur">길이 (초, 최대 ${project.max_transition})</label>
+          <div class="dur"><input id="pdurRange" type="range" min="0.1" max="${project.max_transition}" step="0.1" value="${t.duration}">
+          <input id="pdur" type="number" min="0.1" max="${project.max_transition}" step="0.1" value="${t.duration}"></div></div>
+        <div><label for="pease">움직임</label><select id="pease"></select></div>
+      </div>
     </div>
     <div class="note" id="pnote"></div>
     <div class="row">
       <button type="button" id="applyBtn">전환본 만들기</button>
       <span class="status" id="slideStatus"></span>
     </div>
-    <video id="slideVideo" class="small" controls hidden></video>
-    <pre id="slideVerify" class="verify" hidden></pre>
-    <details id="slideCmdBox" hidden><summary>실행한 ffmpeg 명령</summary><pre id="slideCmd"></pre></details>`;
-  if (selected === 1) {
-    const sel = $('pstart');
-    Object.entries(TRANSITIONS.start_colors).forEach(([k, v]) => sel.appendChild(new Option(v, k)));
-    sel.value = s.start || 'black';
-    sel.addEventListener('change', () => { s.start = sel.value; updateNote(); });
-  }
+    <section id="slideResult" hidden>
+      <video id="slideVideo" class="small" controls></video>
+      <table class="verify" id="slideVerify"></table>
+      <div class="row"><a class="dl" id="slideDownload" download>전환본 내려받기</a></div>
+      <details><summary>실행한 ffmpeg 명령</summary><pre id="slideCmd"></pre></details>
+    </section>`;
+
+  $('srcSeg').querySelectorAll('button').forEach(b => b.addEventListener('click', () => {
+    s.source = b.dataset.src; renderPanel(); renderList();
+  }));
+  renderImageArea(s);
+  dropzone($('imageArea'), $('prevImage'), files => { if (files[0]) uploadPrevImage(selected, files[0]); });
+
   fillTransitionSelect($('ptype'), t.type);
   fillEasingSelect($('pease'), t.easing || 'inout');
-  $('ptype').addEventListener('change', () => {       // 종류를 바꾸면 그 전환의 기본 길이/움직임으로
+  $('ptype').addEventListener('change', () => {
     const d = transitionDefaults($('ptype').value);
-    $('pdur').value = d.duration; $('pease').value = d.easing; saveSettings();
+    $('pdur').value = d.duration; $('pdurRange').value = d.duration; $('pease').value = d.easing; saveSettings();
   });
-  $('pdur').addEventListener('change', saveSettings);
+  $('pdurRange').addEventListener('input', () => { $('pdur').value = $('pdurRange').value; });
+  $('pdurRange').addEventListener('change', saveSettings);
+  $('pdur').addEventListener('change', () => { $('pdurRange').value = $('pdur').value; saveSettings(); });
   $('pease').addEventListener('change', saveSettings);
   $('applyBtn').addEventListener('click', () => applySlide(selected));
-  if (s.output) { const v = $('slideVideo'); v.src = s.output; v.hidden = false; }
-  if (s.verify) { $('slideVerify').textContent = s.verify.lines.join('\n'); $('slideVerify').hidden = false; }
+  if (s.output) showSlideResult(s);
   updateNote();
+}
+
+function renderImageArea(s) {
+  const area = $('imageArea');
+  if (s.source !== 'image') { area.innerHTML = ''; area.className = ''; area.style.display = 'none'; return; }
+  area.style.display = '';
+  if (s.prev_thumb) {
+    area.className = 'imgpick';
+    area.innerHTML = `<img src="${s.prev_thumb}" alt=""><div><div><b>${esc(s.prev_image_name)}</b></div>
+      <div class="hint">이 그림에서 ${s.index}번 영상으로 전환합니다.</div>
+      <button type="button" class="ghost" style="margin-top:6px">다른 이미지로 바꾸기</button></div>`;
+  } else {
+    area.className = 'dropzone small';
+    area.innerHTML = `<b>앞 슬라이드 이미지를 끌어다 놓거나 클릭해서 선택</b><br>${s.index > 1 ? `${s.index - 1}번 슬라이드를 PNG/JPG 로 내보낸 파일` : '시작 화면으로 쓸 이미지'}`;
+  }
+}
+
+async function uploadPrevImage(k, file) {
+  const s = project.slides[k - 1];
+  const fd = new FormData();
+  fd.append('project', project.id); fd.append('slide', String(k)); fd.append('image', file, file.name);
+  setStatus($('slideStatus'), '이미지 올리는 중...');
+  try {
+    const data = await api('/api/slide_image', { method: 'POST', body: fd });
+    if (!data.ok) { setStatus($('slideStatus'), '실패: ' + data.error, 'err'); return; }
+    Object.assign(s, { source: 'image', prev_image_name: data.slide.prev_image_name, prev_thumb: data.slide.prev_thumb });
+    setStatus($('slideStatus'), '');
+    renderPanel(); renderList();
+  } catch (e) { setStatus($('slideStatus'), '요청 실패: ' + e.message, 'err'); }
 }
 
 function updateNote() {
   const s = project.slides[selected - 1];
   const type = $('ptype').value;
-  if (type === 'none') { $('pnote').innerHTML = `전환 없음. ${selected}번 영상을 원본 그대로 씁니다.`; return; }
-  const dur = Number($('pdur').value), ease = TRANSITIONS.easings[$('pease').value] || '';
-  const from = selected === 1
-    ? `<b>${esc(TRANSITIONS.start_colors[s.start || 'black'])}</b>`
-    : (prevImageOf(selected) ? `${selected - 1}번 슬라이드 이미지(<b>${esc(prevImageOf(selected))}</b>)에서` : `<b style="color:#dc2626">${selected - 1}번 슬라이드 이미지가 없어서 만들 수 없습니다</b>`);
+  const needImage = s.source === 'image' && !s.prev_image_name;
+  if (type === 'none') { $('pnote').innerHTML = `전환 없음. ${selected}번 영상을 원본 그대로 씁니다.`; $('applyBtn').disabled = false; $('applyBtn').textContent = '전환 해제'; return; }
+  $('applyBtn').textContent = '전환본 만들기';
+  $('applyBtn').disabled = needImage;
+  const dur = Number($('pdur').value), ease = T.easings[$('pease').value] || '';
+  const from = s.source === 'image'
+    ? (needImage ? `<b style="color:var(--err)">앞에 둘 이미지를 먼저 올려 주세요.</b> 올리면` : `<b>${esc(s.prev_image_name)}</b>에서`)
+    : `<b>${esc(T.start_colors[s.source] || s.source)}</b>`;
   $('pnote').innerHTML = `${from} ${selected}번 영상으로 <b>${esc(labelOf(type))}</b> 전환이 처음 <b>${dur}</b>초 동안 일어나고, 그 뒤는 원본 영상 그대로입니다.
     움직임: ${esc(ease)}. 해상도, fps, 프레임 수, 길이, 음성은 원본과 같게 유지되며 만든 뒤 자동으로 검사합니다.`;
 }
@@ -271,35 +400,44 @@ function updateNote() {
 function saveSettings() {
   const s = project.slides[selected - 1];
   const type = $('ptype').value;
-  const dur = round1(Math.min(project.max_transition, Math.max(0.1, Number($('pdur').value) || TRANSITIONS.default_duration)));
-  $('pdur').value = dur;
+  const dur = round1(Math.min(project.max_transition, Math.max(0.1, Number($('pdur').value) || T.default_duration)));
+  $('pdur').value = dur; $('pdurRange').value = dur;
   s.transition = type === 'none' ? null : { type, duration: dur, easing: $('pease').value, label: labelOf(type) };
   updateNote(); renderList(); drawTimeline();
 }
 
+function showSlideResult(s) {
+  const box = $('slideResult'); if (!box) return;
+  if (!s.output) { box.hidden = true; return; }
+  const v = $('slideVideo'); v.src = s.output;
+  $('slideDownload').href = s.output; $('slideDownload').download = s.name.replace(/\.[^.]+$/, '') + '_transition.mp4';
+  const tbl = $('slideVerify');
+  tbl.innerHTML = (s.verify ? s.verify.items : []).map(i => `<tr class="${i.ok ? 'ok' : 'bad'}"><td>${esc(i.name)}</td><td>원본 ${esc(i.original)}</td><td>${i.ok ? '✓ 동일' : '✗ ' + esc(i.output)}</td></tr>`).join('');
+  $('slideCmd').textContent = s.command || '';
+  box.hidden = false;
+}
+
 async function applySlide(k) {
   const s = project.slides[k - 1];
-  const body = { project: project.id, slide: k, transition: s.transition || { type: 'none' }, start: s.start || 'black' };
+  const body = { project: project.id, slide: k, transition: s.transition || { type: 'none' }, source: s.source };
   const onPanel = (k === selected);
-  if (onPanel) { $('applyBtn').disabled = true; setStatus($('slideStatus'), '만드는 중...'); }
+  if (onPanel) { $('applyBtn').disabled = true; $('applyBtn').classList.add('spin'); setStatus($('slideStatus'), '만드는 중...'); }
   try {
     const data = await postJson('/api/apply', body);
     if (!data.ok) { if (onPanel) setStatus($('slideStatus'), '실패: ' + data.error, 'err'); return false; }
-    Object.assign(s, { output: data.slide.output, verify: data.slide.verify, transition: data.slide.transition, start: data.slide.start });
-    renderList(); drawTimeline();
+    Object.assign(s, { output: data.slide.output, verify: data.slide.verify, transition: data.slide.transition, source: data.slide.source, command: data.command });
+    renderList(); drawTimeline(); renderOutputs(); setSteps(3);
     if (onPanel) {
-      if (!data.video) { setStatus($('slideStatus'), data.report.join(' '), 'ok'); $('slideVideo').hidden = true; $('slideVerify').hidden = true; $('slideCmdBox').hidden = true; return true; }
-      setStatus($('slideStatus'), (data.verify.ok ? 'OK 원본과 동일 규격. ' : '원본과 다름! ') + data.report.join(' '), data.verify.ok ? 'ok' : 'err');
-      const v = $('slideVideo'); v.src = data.video; v.hidden = false; v.play().catch(() => {});
-      $('slideVerify').textContent = data.verify.lines.join('\n'); $('slideVerify').hidden = false;
-      $('slideCmd').textContent = data.command; $('slideCmdBox').hidden = false;
+      if (!data.video) { setStatus($('slideStatus'), data.report.join(' '), 'ok'); $('slideResult').hidden = true; return true; }
+      setStatus($('slideStatus'), (data.verify.ok ? 'OK 원본과 동일 규격 · ' : '원본과 다름! · ') + data.report.join(' '), data.verify.ok ? 'ok' : 'err');
+      showSlideResult(s); $('slideVideo').play().catch(() => {});
     }
     return true;
   } catch (e) {
     if (onPanel) setStatus($('slideStatus'), '요청 실패: ' + e.message, 'err');
     return false;
   } finally {
-    if (onPanel) $('applyBtn').disabled = false;
+    if (onPanel) { $('applyBtn').disabled = false; $('applyBtn').classList.remove('spin'); }
   }
 }
 
@@ -311,7 +449,7 @@ async function renderAll() {
     if (!targets.length) { setStatus($('allStatus'), '전환이 설정된 슬라이드가 없습니다.', 'err'); return; }
     for (const s of targets) {
       setStatus($('allStatus'), `슬라이드 ${s.index} 만드는 중... (${targets.indexOf(s) + 1}/${targets.length})`);
-      if (!(await applySlide(s.index))) { setStatus($('allStatus'), `슬라이드 ${s.index} 실패`, 'err'); return; }
+      if (!(await applySlide(s.index))) { setStatus($('allStatus'), `슬라이드 ${s.index} 실패. 패널에서 원인을 확인하세요.`, 'err'); return; }
     }
     setStatus($('allStatus'), `전환본 ${targets.length}개를 만들었습니다.`, 'ok');
   } finally {
@@ -321,19 +459,26 @@ async function renderAll() {
 
 async function concatAll() {
   $('renderAllBtn').disabled = $('concatBtn').disabled = true; $('result').hidden = true;
-  setStatus($('allStatus'), '이어 붙이는 중...');
+  setStatus($('concatStatus'), '이어 붙이는 중...');
   try {
     const data = await postJson('/api/concat', { project: project.id });
-    if (!data.ok) { setStatus($('allStatus'), '실패: ' + data.error, 'err'); return; }
-    setStatus($('allStatus'), data.report[0], 'ok');
+    if (!data.ok) { setStatus($('concatStatus'), '실패: ' + data.error, 'err'); return; }
+    setStatus($('concatStatus'), data.report[0], 'ok');
     $('video').src = data.video; $('download').href = data.video;
     $('report').textContent = data.report.join('\n'); $('cmd').textContent = data.command;
-    $('result').hidden = false;
+    $('result').hidden = false; setSteps(3);
   } catch (e) {
-    setStatus($('allStatus'), '요청 실패: ' + e.message, 'err');
+    setStatus($('concatStatus'), '요청 실패: ' + e.message, 'err');
   } finally {
     $('renderAllBtn').disabled = $('concatBtn').disabled = false;
   }
+}
+
+function renderOutputs() {
+  const box = $('outputs');
+  box.innerHTML = project.slides.map(s => `<div class="o"><div class="t">${s.index}. ${esc(s.name)}</div>` +
+    (s.output ? `<a href="${s.output}" download="${esc(s.name.replace(/\.[^.]+$/, ''))}_transition.mp4">전환본 내려받기</a> · <span class="hint">${esc(s.transition ? (s.transition.label || s.transition.type) : '')}</span>`
+              : `<span class="hint">원본 그대로 (전환본 없음)</span>`) + `</div>`).join('');
 }
 
 function drawTimeline() {
@@ -341,7 +486,7 @@ function drawTimeline() {
   const total = project.slides.reduce((a, s) => a + s.duration, 0);
   const colors = ['#2563eb', '#ea580c', '#059669', '#7c3aed', '#db2777', '#0891b2'];
   project.slides.forEach((s, i) => {
-    const d = document.createElement('div'); d.className = 'seg';
+    const d = document.createElement('div'); d.className = 'seg-t';
     d.style.left = (startAt(s.index) / total * 100) + '%'; d.style.width = (s.duration / total * 100) + '%';
     d.style.background = colors[i % colors.length];
     d.textContent = `${s.index}. ${s.duration.toFixed(2)}s`; d.title = `${s.name} ${s.duration.toFixed(2)}s`;
