@@ -35,7 +35,9 @@ import subprocess
 import sys
 from pathlib import Path
 
-WIDTH, HEIGHT, FPS = 1920, 1080, 30   # 모든 슬라이드 영상의 공통 규격 (이어 붙이려면 같아야 한다)
+WIDTH, HEIGHT, FPS = 1920, 1080, 60   # 모든 슬라이드 영상의 공통 규격 (이어 붙이려면 같아야 한다)
+# FPS 60 인 이유: 30 에서는 1초 밀어내기가 한 프레임에 64~98px 씩 점프해 글자가 번져 보인다.
+# 정지 구간은 같은 프레임의 반복이라 60 이어도 용량이 거의 늘지 않는다. 필요하면 --fps 30.
 MAX_TRANSITION = 1.0                  # 전환 길이 상한(초)
 DEFAULT_TRANSITION_DURATION = 0.5
 EASE_OVERSAMPLE = 4                   # 이징: 전환 구간을 FPS*4 로 먼저 렌더한 뒤 시간축을 휘어 FPS 로 다시 샘플
@@ -234,28 +236,31 @@ def build_render_command(image: Path, duration: float, out: Path,
 
 
 def _encode_args(out: Path) -> list[str]:
-    return ["-c:v", "libx264", "-preset", "medium", "-tune", "stillimage", "-crf", "18",
+    # crf 14, tune 없음: 전환처럼 움직이는 프레임도 선명하게 유지된다. 측정(무손실 대비 PSNR)에서
+    # stillimage+crf18 은 전환 프레임 49dB/645KB, crf14 는 52dB/666KB 로 용량은 비슷하고 화질은 위.
+    # 정지 구간은 어차피 같은 프레임의 반복이라 용량이 거의 늘지 않는다.
+    return ["-c:v", "libx264", "-preset", "medium", "-crf", "14",
             "-pix_fmt", "yuv420p", "-movflags", "+faststart", str(out)]
 
 
 def render_slide(image: Path, duration: float, out: Path, prev_image: Path | None = None,
                  transition: str | None = None, tdur: float | None = None,
-                 easing: str | None = None) -> list[str]:
-    cmd = build_render_command(image, duration, out, prev_image, transition, tdur, easing)
+                 easing: str | None = None, fps: int = FPS) -> list[str]:
+    cmd = build_render_command(image, duration, out, prev_image, transition, tdur, easing, fps=fps)
     out.parent.mkdir(parents=True, exist_ok=True)
     ffmpeg(*cmd)
     return cmd
 
 
 def report_slide(out: Path, duration: float, transition: str | None, tdur: float | None = None,
-                 easing: str | None = None) -> dict:
-    expected = snap(duration)
+                 easing: str | None = None, fps: int = FPS) -> dict:
+    expected = snap(duration, fps)
     actual = probe_duration(out)
-    ok = abs(expected - actual) <= 1 / FPS + 1e-6
+    ok = abs(expected - actual) <= 1 / fps + 1e-6
     lines = [f"슬라이드 길이 {expected:.3f}s / 출력 {actual:.3f}s  " + ("OK 길이 유지" if ok else "!! 길이 불일치")]
     if transition and transition != "none":
         xf, def_dur, def_ease, label = resolve_transition(transition)
-        t = snap(tdur if tdur is not None else def_dur)
+        t = snap(tdur if tdur is not None else def_dur, fps)
         ease = easing or def_ease
         lines.append(f"  0.000s ~ {t:.3f}s  {label} [xfade {xf}], 움직임: {EASINGS[ease]} (앞 슬라이드 이미지 -> 이 슬라이드)")
     else:
@@ -335,13 +340,15 @@ def main() -> None:
                    help="프리셋 키(push_right, wipe_left, fade ...) 또는 xfade 원본 이름. 기본 none. 목록: --list")
     r.add_argument("--tdur", type=float, help=f"전환 길이(초), 최대 {MAX_TRANSITION}. 생략하면 프리셋 기본값")
     r.add_argument("--easing", choices=list(EASINGS), help="움직임: inout / out / none. 생략하면 프리셋 기본값")
+    r.add_argument("--fps", type=int, default=FPS, help=f"프레임레이트 (기본 {FPS}). 60 이면 움직임이 더 매끄럽다")
     r.add_argument("--out", type=Path, required=True)
 
     c = sub.add_parser("concat", help="슬라이드 영상들을 재인코딩 없이 이어 붙이기")
     c.add_argument("videos", nargs="+", type=Path)
     c.add_argument("--out", type=Path, required=True)
 
-    sub.add_parser("sample", help="샘플 4장을 만들고 2번 페이드, 4번 밀어내기로 렌더한 뒤 이어 붙이기")
+    sp = sub.add_parser("sample", help="샘플 4장을 만들고 2번 페이드, 4번 밀어내기로 렌더한 뒤 이어 붙이기")
+    sp.add_argument("--fps", type=int, default=FPS)
     sub.add_parser("list", help="프리셋과 xfade 전환 목록")
     args = ap.parse_args()
 
@@ -355,8 +362,8 @@ def main() -> None:
     if args.cmd == "render":
         if args.transition != "none" and not args.prev:
             sys.exit("전환을 넣으려면 --prev 로 앞 슬라이드 이미지를 주세요")
-        render_slide(args.image, args.duration, args.out, args.prev, args.transition, args.tdur, args.easing)
-        ok = report_slide(args.out, args.duration, args.transition, args.tdur, args.easing)["ok"]
+        render_slide(args.image, args.duration, args.out, args.prev, args.transition, args.tdur, args.easing, args.fps)
+        ok = report_slide(args.out, args.duration, args.transition, args.tdur, args.easing, args.fps)["ok"]
     elif args.cmd == "concat":
         concat_videos(args.videos, args.out)
         ok = report_concat(args.videos, args.out)["ok"]
@@ -370,8 +377,8 @@ def main() -> None:
             name, tdur = settings.get(k, ("none", 0.0))
             prev = images[k - 2] if k > 1 and name != "none" else None
             print(f"== 슬라이드 {k}: {'전환 ' + name + f' {tdur}s' if prev else '전환 없음'}")
-            render_slide(image, SAMPLE_DURATIONS[k - 1], out, prev, name, tdur)
-            ok &= report_slide(out, SAMPLE_DURATIONS[k - 1], name, tdur)["ok"]
+            render_slide(image, SAMPLE_DURATIONS[k - 1], out, prev, name, tdur, fps=args.fps)
+            ok &= report_slide(out, SAMPLE_DURATIONS[k - 1], name, tdur, fps=args.fps)["ok"]
             videos.append(out)
         print("== 이어 붙이기 (재인코딩 없음)")
         concat_videos(videos, OUT / "all.mp4")

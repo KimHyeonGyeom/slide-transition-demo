@@ -112,7 +112,7 @@ def public_slide(s: dict) -> dict:
 
 
 def public_project(project: dict) -> dict:
-    return {"id": project["id"], "max_transition": sr.MAX_TRANSITION,
+    return {"id": project["id"], "fps": project.get("fps", sr.FPS), "max_transition": sr.MAX_TRANSITION,
             "default_transition_duration": sr.DEFAULT_TRANSITION_DURATION,
             "slides": [public_slide(s) for s in project["slides"]]}
 
@@ -126,6 +126,9 @@ def create_project(fields: dict[str, list[str]], files: dict[str, list[tuple[str
     default_dur = float(field(fields, "duration", str(DEFAULT_SLIDE_DURATION)))
     if default_dur <= 0:
         raise ValueError("슬라이드 길이는 0보다 커야 합니다")
+    fps = int(field(fields, "fps", str(sr.FPS)))
+    if fps not in (24, 25, 30, 50, 60):
+        raise ValueError("프레임레이트는 24 / 25 / 30 / 50 / 60 중 하나")
     if field(fields, "use_sample", "0") == "1":
         images = sample_images()
         durations = list(sr.SAMPLE_DURATIONS)
@@ -142,9 +145,9 @@ def create_project(fields: dict[str, list[str]], files: dict[str, list[tuple[str
         make_thumb(image, job / "thumbs" / f"{i}.jpg")
         slides.append({"index": i, "name": image.name, "image": str(image),
                        "thumb": f"/jobs/{job.name}/thumbs/{i}.jpg",
-                       "duration": sr.snap(durations[i - 1]), "transition": None,
+                       "duration": sr.snap(durations[i - 1], fps), "transition": None,
                        "video": None, "video_url": None})
-    project = {"id": job.name, "slides": slides}
+    project = {"id": job.name, "fps": fps, "slides": slides}
     save_project(project)
     return {"ok": True, "project": public_project(project)}
 
@@ -175,12 +178,13 @@ def render_slide_job(body: dict) -> dict:
             raise ValueError("움직임(easing)은 inout / out / none 중 하나")
     prev = Path(slides[k - 2]["image"]) if ttype != "none" else None
 
+    fps = int(proj.get("fps", sr.FPS))
     out = JOBS / proj["id"] / f"slide{k}_{uuid.uuid4().hex[:6]}.mp4"
-    cmd = sr.render_slide(Path(s["image"]), duration, out, prev, ttype, tdur, easing)
-    rep = sr.report_slide(out, duration, ttype, tdur, easing)
+    cmd = sr.render_slide(Path(s["image"]), duration, out, prev, ttype, tdur, easing, fps)
+    rep = sr.report_slide(out, duration, ttype, tdur, easing, fps)
 
-    s["duration"] = sr.snap(duration)
-    s["transition"] = ({"type": ttype, "duration": sr.snap(tdur), "easing": easing, "label": label}
+    s["duration"] = sr.snap(duration, fps)
+    s["transition"] = ({"type": ttype, "duration": sr.snap(tdur, fps), "easing": easing, "label": label}
                        if ttype != "none" else None)
     s["video"] = str(out)
     s["video_url"] = f"/jobs/{proj['id']}/{out.name}"

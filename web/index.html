@@ -76,6 +76,11 @@
     <div class="files" id="imageList"></div>
     <label for="defdur">슬라이드 기본 길이 (초). 나중에 슬라이드마다 바꿀 수 있습니다</label>
     <input id="defdur" type="number" min="0.5" step="0.1" value="3.0">
+    <label for="deffps">프레임레이트</label>
+    <select id="deffps">
+      <option value="60" selected>60 fps (기본. 전환이 매끄럽고 움직일 때 글자 번짐이 적음)</option>
+      <option value="30">30 fps</option>
+    </select>
     <div class="row" style="margin-top:12px">
       <button type="button" id="uploadBtn">프로젝트 만들기</button>
       <button type="button" class="secondary" id="sampleBtn">샘플 4장으로 시작</button>
@@ -150,6 +155,7 @@ async function createProject(useSample) {
   const fd = new FormData();
   fd.append('use_sample', useSample ? '1' : '0');
   fd.append('duration', $('defdur').value);
+  fd.append('fps', $('deffps').value);
   if (!useSample) {
     const images = sortByName($('images').files);
     if (images.length < 2) { setStatus($('status'), '슬라이드 이미지를 2장 이상 선택해 주세요.', 'err'); return; }
@@ -161,7 +167,7 @@ async function createProject(useSample) {
     const data = await api('/api/upload', { method: 'POST', body: fd });
     if (!data.ok) { setStatus($('status'), '실패: ' + data.error, 'err'); return; }
     project = data.project; selected = Math.min(2, project.slides.length);
-    setStatus($('status'), `슬라이드 ${project.slides.length}장. 왼쪽 목록에서 슬라이드를 골라 길이와 전환을 정한 뒤 영상을 만드세요.`, 'ok');
+    setStatus($('status'), `슬라이드 ${project.slides.length}장, ${project.fps}fps. 왼쪽 목록에서 슬라이드를 골라 길이와 전환을 정한 뒤 영상을 만드세요.`, 'ok');
     $('editor').hidden = false; $('result').hidden = true; setStatus($('allStatus'), '');
     renderList(); renderPanel(); drawTimeline();
     $('editor').scrollIntoView({ behavior: 'smooth' });
