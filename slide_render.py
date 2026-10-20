@@ -49,10 +49,12 @@ PRESETS = {
     "push_left":     ("밀어내기 (왼쪽에서)",      "slideright",  1.0, "inout"),
     "push_bottom":   ("밀어내기 (아래에서)",      "slideup",     1.0, "inout"),
     "push_top":      ("밀어내기 (위에서)",        "slidedown",   1.0, "inout"),
-    "wipe_right":    ("닦아내기 (오른쪽에서)",    "smoothleft",  1.0, "inout"),
-    "wipe_left":     ("닦아내기 (왼쪽에서)",      "smoothright", 1.0, "inout"),
-    "wipe_bottom":   ("닦아내기 (아래에서)",      "smoothup",    1.0, "inout"),
-    "wipe_top":      ("닦아내기 (위에서)",        "smoothdown",  1.0, "inout"),
+    # 닦아내기는 또렷한 경계(wipe*)를 쓴다. smooth* 는 그라데이션 띠가 너무 넓어 앞선이 0.6초 만에
+    # 화면을 가로질러 실제보다 빠르게 느껴진다. 움직임도 살짝만 완만하게 해서 1초를 고르게 쓴다.
+    "wipe_right":    ("닦아내기 (오른쪽에서)",    "wipeleft",    1.0, "soft"),
+    "wipe_left":     ("닦아내기 (왼쪽에서)",      "wiperight",   1.0, "soft"),
+    "wipe_bottom":   ("닦아내기 (아래에서)",      "wipeup",      1.0, "soft"),
+    "wipe_top":      ("닦아내기 (위에서)",        "wipedown",    1.0, "soft"),
     "cover_right":   ("덮기 (오른쪽에서)",        "coverleft",   1.0, "inout"),
     "cover_left":    ("덮기 (왼쪽에서)",          "coverright",  1.0, "inout"),
     "uncover_left":  ("벗기기 (왼쪽으로)",        "revealleft",  1.0, "inout"),
@@ -68,9 +70,11 @@ PRESETS = {
 }
 EASINGS = {
     "inout": "부드럽게 (천천히 시작해서 천천히 끝)",
+    "soft":  "살짝 부드럽게 (조금만 완만하게)",
     "out":   "감속 (빠르게 시작해서 천천히 끝)",
     "none":  "일정한 속도",
 }
+SOFT_GAMMA = 1.25   # soft 곡선 세기. 1 이면 일정 속도, 클수록 inout 에 가까워진다
 # 원본 xfade 이름을 직접 쓸 때, 움직임이 아니라 섞임 위주라 이징이 의미 없는 것들
 LINEAR_RAW = {"fade", "fadeblack", "fadewhite", "fadefast", "fadeslow", "fadegrays",
               "dissolve", "pixelize", "hblur", "distance"}
@@ -154,10 +158,15 @@ def ease_setpts(easing: str, t: float) -> str | None:
     """전환 구간(0~t초)의 시간축을 휘는 setpts 식. 선형으로 렌더한 프레임(진행도 p = T/t)을
     원하는 속도 곡선의 역함수 위치로 옮긴다. 그 뒤 fps 필터가 일정한 간격으로 다시 샘플한다.
       inout: smoothstep p = u^2(3-2u) 의 역함수 u = 0.5 - sin(asin(1-2p)/3)
+      soft:  gain 곡선 p = u^g/(u^g+(1-u)^g) (g=SOFT_GAMMA) 의 역함수 = 같은 식에 지수 1/g
       out:   ease-out   p = 1-(1-u)^2 의 역함수 u = 1 - sqrt(1-p)
     T 는 setpts 의 프레임 시각 변수(초)."""
     if easing == "inout":
         inv = f"(0.5-sin(asin(1-2*min(T/{t:.4f},1))/3))"
+    elif easing == "soft":
+        q = 1 / SOFT_GAMMA
+        inv = (f"(pow(min(T/{t:.4f},1),{q:.4f})/(pow(min(T/{t:.4f},1),{q:.4f})"
+               f"+pow(1-min(T/{t:.4f},1),{q:.4f})))")
     elif easing == "out":
         inv = f"(1-sqrt(1-min(T/{t:.4f},1)))"
     else:

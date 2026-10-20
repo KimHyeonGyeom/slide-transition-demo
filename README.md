@@ -54,7 +54,7 @@ python3 slide_render.py list                                                 # �
 |---|---|---|---|---|
 | fade / fade_black | 페이드 / 페이드 (검정 거쳐서) | fade / fadeblack | 0.7s | 일정 |
 | push_right / push_left / push_bottom / push_top | 밀어내기 (새 슬라이드가 들어오는 방향) | slideleft / slideright / slideup / slidedown | 1.0s | 부드럽게 |
-| wipe_right / wipe_left / wipe_bottom / wipe_top | 닦아내기 (경계가 부드러운 와이프) | smoothleft / smoothright / smoothup / smoothdown | 1.0s | 부드럽게 |
+| wipe_right / wipe_left / wipe_bottom / wipe_top | 닦아내기 | wipeleft / wiperight / wipeup / wipedown | 1.0s | 살짝 부드럽게 |
 | cover_right / cover_left | 덮기 | coverleft / coverright | 1.0s | 부드럽게 |
 | uncover_left / uncover_right | 벗기기 (앞 슬라이드가 나가는 방향) | revealleft / revealright | 1.0s | 부드럽게 |
 | split_h / split_v | 나누기 (바깥쪽으로) | horzopen / vertopen | 1.0s | 부드럽게 |
@@ -65,7 +65,9 @@ python3 slide_render.py list                                                 # �
 | dissolve | 디졸브 | dissolve | 1.0s | 일정 |
 | flash | 밝기 변화 (흰색 거쳐서) | fadewhite | 0.7s | 일정 |
 
-움직임(easing)은 `inout`(부드럽게: 천천히 시작해 천천히 끝), `out`(감속), `none`(일정한 속도) 중 고른다.
+움직임(easing)은 `inout`(부드럽게: 천천히 시작해 천천히 끝), `soft`(살짝 부드럽게), `out`(감속), `none`(일정한 속도) 중 고른다.
+닦아내기에 xfade 의 smooth 계열을 쓰지 않는 이유: 그라데이션 띠가 넓어서 눈에 보이는 앞선이 1초 전환에서도
+0.6초 만에 화면을 가로질러 실제보다 빠르게 느껴진다. 또렷한 경계(wipe*)는 앞선이 1초를 고르게 쓴다.
 
 ### 이징은 어떻게 넣나
 
