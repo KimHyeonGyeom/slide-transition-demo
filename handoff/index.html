@@ -65,7 +65,10 @@
       <div class="k">출력 파일 이름</div>
       <div class="v"><input type="text" class="mono" id="outName" style="width:22em" placeholder="영상을 고르면 자동으로 정해집니다"></div>
       <div class="k">파일이 있는 폴더 <span class="spec">(선택)</span></div>
-      <div class="v"><input type="text" class="mono" id="folder" style="width:26em" placeholder="비우면 파일 이름만 넣습니다. 그 폴더에서 명령어를 실행하세요"></div>
+      <div class="v" style="flex-direction:column; align-items:flex-start; gap:4px">
+        <input type="text" class="mono" id="folder" style="width:30em" placeholder='탐색기에서 "경로로 복사"한 경로를 붙여넣으세요. 파일 경로면 파일 이름은 자동으로 뺍니다'>
+        <span class="spec" id="folderHint">비우면 파일 이름만 넣습니다. 그 폴더에서 명령어를 실행하세요.</span>
+      </div>
     </div>
     <input id="videoFile" type="file" accept="video/mp4,video/*" hidden>
     <input id="imageFile" type="file" accept="image/*" hidden>
@@ -189,7 +192,16 @@ function readVideoMeta(file) {   // 해상도, 길이 (브라우저 디코더)
 }
 
 // ---------------------------------------------------------------- 화면
-function fileArg(name) { const f = $('folder').value.trim(); if (!f) return name; const sep = /[\\/]$/.test(f) ? '' : (f.includes('\\') && !f.includes('/') ? '\\' : '/'); return f + sep + name; }
+// 폴더 칸: 따옴표를 벗기고, 탐색기 "경로로 복사"로 얻은 파일 경로면 파일 이름을 떼어 폴더만 쓴다
+const MEDIA_EXT = /\.(mp4|mov|m4v|mkv|webm|avi|png|jpg|jpeg|bmp|gif|webp)$/i;
+function folderValue() {
+  let f = $('folder').value.trim().replace(/^["']+|["']+$/g, '');
+  if (!f) return '';
+  const last = f.split(/[\\/]/).pop();
+  if (MEDIA_EXT.test(last) && f.length > last.length) f = f.slice(0, f.length - last.length);
+  return f.replace(/[\\/]+$/, '');
+}
+function fileArg(name) { const f = folderValue(); if (!f) return name; return f + (f.includes('\\') ? '\\' : '/') + name; }
 function render() {
   const p = state.preset;
   $('imagePick').style.display = state.source === 'image' ? '' : 'none';
@@ -234,7 +246,11 @@ $('videoFile').addEventListener('change', async () => {
 });
 $('imageFile').addEventListener('change', () => { const f = $('imageFile').files[0]; if (!f) return; state.image = f.name; $('imageName').textContent = f.name; render(); });
 $('outName').addEventListener('input', () => { $('outName').dataset.auto = '0'; render(); });
-$('folder').addEventListener('input', render);
+$('folder').addEventListener('input', () => {
+  const f = folderValue();
+  $('folderHint').textContent = f ? `모든 파일 앞에 붙는 폴더: ${f}` : '비우면 파일 이름만 넣습니다. 그 폴더에서 명령어를 실행하세요.';
+  render();
+});
 $('srcSeg').querySelectorAll('button').forEach(b => b.addEventListener('click', () => { state.source = b.dataset.src; $('srcSeg').querySelectorAll('button').forEach(x => x.classList.toggle('active', x === b)); render(); }));
 $('enc').addEventListener('change', () => { $('encArgs').value = ENCODER_DEFAULTS[$('enc').value]; render(); });
 $('encArgs').addEventListener('input', render);
