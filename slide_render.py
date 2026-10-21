@@ -345,8 +345,9 @@ SAMPLE_COLORS = ["0x1e3a8a", "0xb45309", "0x065f46", "0x5b21b6"]
 SAMPLE_DURATIONS = [3.0, 3.5, 2.5, 3.0]
 
 
-def make_slide_image(path: Path, title: str, subtitle: str, color: str) -> None:
-    vf = (f"drawbox=x=0:y=0:w=48:h=ih:color=white@0.35:t=fill,"
+def make_slide_image(path: Path, title: str, subtitle: str, color: str, strip: bool = True) -> None:
+    """단색 배경 + 제목/부제. strip: 왼쪽 가장자리의 밝은 띠(전환 미리보기에서 슬라이드가 움직이는 게 보이도록)."""
+    vf = ((f"drawbox=x=0:y=0:w=48:h=ih:color=white@0.35:t=fill," if strip else "") +
           f"drawtext={font_opt()}text='{title}':fontsize=170:fontcolor=white:"
           f"x=(w-text_w)/2:y=(h-text_h)/2-70,"
           f"drawtext={font_opt()}text='{subtitle}':fontsize=54:fontcolor=white@0.75:"
