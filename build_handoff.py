@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """개발자 전달용 단일 HTML(handoff/index.html) 생성기.
 
-프리셋마다 미리보기(샘플 슬라이드 1 -> 2, 전환 1초, 480x270, 2초)를 렌더해 base64 로 HTML 에 내장한다.
+프리셋마다 미리보기(samples/transition_slide1.png -> transition_slide2.png, 전환 1초, 800x450, 2초)를 렌더해 base64 로 HTML 에 내장한다.
 명령어는 handoff_template.html 의 자바스크립트가 전역 설정에 맞춰 조립한다 (파이썬 build_apply_command 와 같은 구조).
 
   python3 build_handoff.py            # -> handoff/index.html (미리보기는 work/handoff/ 에 캐시)
@@ -21,21 +21,25 @@ import slide_transition as st  # noqa: E402
 BASE = Path(__file__).resolve().parent
 OUT_DIR = BASE / "handoff"
 TMP = sr.WORK / "handoff"
+SAMPLES = BASE / "samples"
+PREV_IMAGE = SAMPLES / "transition_slide1.png"   # 미리보기의 앞 슬라이드
+NEXT_IMAGE = SAMPLES / "transition_slide2.png"   # 미리보기 영상(슬라이드 2)의 원본 그림
 PW, PH = 800, 450          # 미리보기 크기 (팝업에서 크게 보므로 480x270 보다 키움, 짝수 크기)
 PREVIEW_SEC = 2.0          # 전환 1초 + 정지 1초
 EASING_SHORT = {"inout": "부드럽게", "soft": "살짝 부드럽게", "out": "감속", "none": "일정 속도"}
 
 
 def ensure_samples() -> None:
-    if not all((sr.WORK / f).exists() for f in ("orig2.mp4", "slide1.png")):
-        st.make_sample_originals(4, st.pick_encoder())
+    for f in (PREV_IMAGE, NEXT_IMAGE):
+        if not f.exists():
+            raise SystemExit(f"샘플 이미지가 없습니다: {f}")
 
 
 def make_preview_source() -> Path:
-    """샘플 2번 원본 영상을 480x270, 2초, 무음으로 줄인 미리보기용 원본."""
+    """samples/transition_slide2.png 를 800x450, 2초, 무음 영상으로 만든 미리보기용 원본 (자막 없음)."""
     src = TMP / "src.mp4"
-    sr.ffmpeg("-i", str(sr.WORK / "orig2.mp4"), "-t", f"{PREVIEW_SEC}", "-vf", f"scale={PW}:{PH}", "-an",
-              "-c:v", "libx264", "-crf", "18", "-pix_fmt", "yuv420p", str(src))
+    sr.ffmpeg("-loop", "1", "-framerate", "30", "-t", f"{PREVIEW_SEC}", "-i", str(NEXT_IMAGE),
+              "-vf", f"scale={PW}:{PH},format=yuv420p", "-c:v", "libx264", "-crf", "18", str(src))
     return src
 
 
@@ -44,7 +48,7 @@ def render_preview(key: str, src: Path) -> tuple[bytes, bytes]:
     if mp4.exists() and webm.exists() and "--rebuild" not in sys.argv:      # 이미 만든 미리보기는 재사용
         return mp4.read_bytes(), webm.read_bytes()
     raw = TMP / f"{key}_raw.mp4"
-    st.apply(src, str(sr.WORK / "slide1.png"), key, raw, tdur=1.0, easing=None, encoder="libx264")
+    st.apply(src, str(PREV_IMAGE), key, raw, tdur=1.0, easing=None, encoder="libx264")
     sr.ffmpeg("-i", str(raw), "-an", "-c:v", "libx264", "-preset", "slow", "-crf", "26", "-pix_fmt", "yuv420p",
               "-movflags", "+faststart", str(mp4))
     sr.ffmpeg("-i", str(raw), "-an", "-c:v", "libvpx-vp9", "-b:v", "0", "-crf", "36", "-row-mt", "1", str(webm))
