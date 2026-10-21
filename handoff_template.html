@@ -51,27 +51,22 @@
 <body>
 <main>
   <h1>슬라이드 전환 명령어</h1>
-  <p class="lead">슬라이드 영상의 처음 1초를 "앞 슬라이드 이미지 → 이 영상" 전환으로 바꾸는 ffmpeg 명령어입니다. 결과는 원본과 해상도, fps, 프레임 수, 길이가 같고 음성은 그대로 복사됩니다. 파일을 고르고, 효과를 고르고, 복사하세요.</p>
+  <p class="lead">슬라이드 영상의 처음 1초를 "앞 슬라이드 이미지 → 이 영상" 전환으로 바꾸는 ffmpeg 명령어입니다. 결과는 원본과 해상도, fps, 프레임 수, 길이가 같고 음성은 그대로 복사됩니다. 경로를 넣고, 효과를 고르고, 복사하세요.</p>
 
   <section class="card">
     <div class="pick">
       <div class="k">슬라이드 영상</div>
-      <div class="v"><button type="button" id="pickVideo">파일 선택</button><span class="file" id="videoName">아직 선택 안 함</span><span class="spec" id="videoSpec"></span></div>
+      <div class="v"><input type="text" class="mono" id="videoPath" style="width:34em" placeholder="C:\slides\slide2.mp4  (탐색기에서 Shift+우클릭 → 경로로 복사 → 붙여넣기)"></div>
       <div class="k">앞에 둘 그림</div>
       <div class="v">
         <div class="seg" id="srcSeg"><button data-src="image" class="active">앞 슬라이드 이미지</button><button data-src="black">검정 화면 (첫 슬라이드)</button><button data-src="white">흰색 화면 (첫 슬라이드)</button></div>
-        <span id="imagePick"><button type="button" id="pickImage">파일 선택</button> <span class="file" id="imageName">아직 선택 안 함</span></span>
+        <input type="text" class="mono" id="imagePath" style="width:24em" placeholder="C:\slides\slide1.png">
       </div>
-      <div class="k">출력 파일 이름</div>
-      <div class="v"><input type="text" class="mono" id="outName" style="width:22em" placeholder="영상을 고르면 자동으로 정해집니다"></div>
-      <div class="k">파일이 있는 폴더 <span class="spec">(선택)</span></div>
-      <div class="v" style="flex-direction:column; align-items:flex-start; gap:4px">
-        <input type="text" class="mono" id="folder" style="width:30em" placeholder='탐색기에서 "경로로 복사"한 경로를 붙여넣으세요. 파일 경로면 파일 이름은 자동으로 뺍니다'>
-        <span class="spec" id="folderHint">비우면 파일 이름만 넣습니다. 그 폴더에서 명령어를 실행하세요.</span>
-      </div>
+      <div class="k">출력 파일</div>
+      <div class="v"><input type="text" class="mono" id="outPath" style="width:34em" placeholder="영상 경로를 넣으면 같은 폴더에 _transition 이름으로 자동"></div>
+      <div class="k">영상 규격</div>
+      <div class="v"><span class="spec">가로</span><input type="text" class="mono" id="w" value="1920" style="width:5.5em"><span class="spec">세로</span><input type="text" class="mono" id="h" value="1080" style="width:5.5em"><span class="spec">fps</span><input type="text" class="mono" id="fps" value="30" style="width:7em"><span class="spec">파이프라인 규격이 다르면 고치세요. 모르면 <code>ffprobe 파일</code> 로 확인</span></div>
     </div>
-    <input id="videoFile" type="file" accept="video/mp4,video/*" hidden>
-    <input id="imageFile" type="file" accept="image/*" hidden>
   </section>
 
   <section>
@@ -90,7 +85,7 @@
     <pre id="cmd"></pre>
     <details><summary>코드에서 쓸 인자 배열(JSON)과 설명</summary>
       <div class="in">
-        <div>영상 파일을 고르면 브라우저에서 해상도와 fps를 읽어 명령어에 넣습니다. 브라우저는 파일의 전체 경로를 알려주지 않으므로 명령어에는 파일 이름만 들어갑니다. 파일이 있는 폴더에서 실행하거나 위의 폴더 칸에 경로를 넣으세요.</div>
+        <div>영상 규격(가로, 세로, fps)은 앞 그림을 영상에 맞추고 전환 구간을 4배 샘플링하는 데 쓰입니다. 파이프라인 규격과 같아야 하며, 모르면 <code>ffprobe -v error -select_streams v:0 -show_entries stream=width,height,r_frame_rate -of csv=p=0 파일</code> 로 확인합니다.</div>
         <div>구조: 앞 그림 1초 + 영상의 처음 1초를 <code>xfade</code>로 겹치고(offset 0) 나머지와 <code>concat</code>. 프레임 수가 원본과 같습니다. 움직임이 있는 효과는 전환 구간을 fps의 4배로 뽑은 뒤 <code>setpts</code>로 속도 곡선을 넣습니다. 음성은 <code>-c:a copy</code>.</div>
         <div>인코더 옵션: <input type="text" class="mono" id="encArgs" style="width:100%; margin-top:4px"></div>
         <pre id="cmdJson"></pre>
@@ -107,7 +102,8 @@ const ENCODER_DEFAULTS = {
   libx264: '-c:v libx264 -preset medium -crf 14 -pix_fmt yuv420p',
 };
 const T = '1.0000';   // 전환 길이 1초 고정
-const state = { video: null, image: null, w: 1920, h: 1080, fps: '30', fpsKnown: false, source: 'image', preset: null };
+const state = { source: 'image', preset: null };
+const clean = (v) => v.trim().replace(/^["']+|["']+$/g, '');    // 탐색기 "경로로 복사" 의 따옴표 제거
 
 // ---------------------------------------------------------------- 명령어 조립 (파이썬 slide_transition.build_apply_command 와 같은 구조)
 // BUILDER-START
@@ -142,75 +138,17 @@ const q = (a) => /[\s;()\[\]'"{}$*?&|<>]/.test(a) ? '"' + a.replace(/"/g, '\\"')
 const oneLine = (args) => 'ffmpeg -y ' + args.map(q).join(' ');
 // BUILDER-END
 
-// ---------------------------------------------------------------- MP4 컨테이너에서 규격 읽기: 해상도(stsd), fps(mdhd.timescale / stts.delta), 프레임 수
-// 브라우저 디코더에 의존하지 않으므로 H.264 코덱이 없는 브라우저에서도 동작한다.
-async function readMp4Info(file) {
-  const u8 = async (off, len) => new Uint8Array(await file.slice(off, off + len).arrayBuffer());
-  const u32 = (b, i) => ((b[i] << 24) >>> 0) + (b[i + 1] << 16) + (b[i + 2] << 8) + b[i + 3];
-  const u16 = (b, i) => (b[i] << 8) + b[i + 1];
-  const str = (b, i) => String.fromCharCode(b[i], b[i + 1], b[i + 2], b[i + 3]);
-  let off = 0, moov = null;
-  while (off + 8 <= file.size) {                       // 최상위 박스에서 moov 찾기 (앞이든 뒤든)
-    const h = await u8(off, 16);
-    let size = u32(h, 0); const type = str(h, 4);
-    if (size === 1) size = u32(h, 8) * 4294967296 + u32(h, 12);
-    if (size === 0) size = file.size - off;
-    if (type === 'moov') { moov = await u8(off, size); break; }
-    if (size < 8) break;
-    off += size;
-  }
-  if (!moov) return null;
-  const boxes = (buf, start, end) => { const out = []; let o = start; while (o + 8 <= end) { let size = u32(buf, o); const type = str(buf, o + 4); let hdr = 8; if (size === 1) { size = u32(buf, o + 8) * 4294967296 + u32(buf, o + 12); hdr = 16; } if (size === 0) size = end - o; if (size < 8) break; out.push({ type, start: o + hdr, end: o + size }); o += size; } return out; };
-  for (const trak of boxes(moov, 8, moov.length).filter(b => b.type === 'trak')) {
-    const mdia = boxes(moov, trak.start, trak.end).find(b => b.type === 'mdia'); if (!mdia) continue;
-    const parts = boxes(moov, mdia.start, mdia.end);
-    const hdlr = parts.find(b => b.type === 'hdlr'); if (!hdlr || str(moov, hdlr.start + 8) !== 'vide') continue;
-    const mdhd = parts.find(b => b.type === 'mdhd'); const minf = parts.find(b => b.type === 'minf'); if (!mdhd || !minf) continue;
-    const timescale = moov[mdhd.start] === 1 ? u32(moov, mdhd.start + 20) : u32(moov, mdhd.start + 12);
-    const stbl = boxes(moov, minf.start, minf.end).find(b => b.type === 'stbl'); if (!stbl) continue;
-    const sb = boxes(moov, stbl.start, stbl.end);
-    const stts = sb.find(b => b.type === 'stts'), stsd = sb.find(b => b.type === 'stsd'); if (!stts) continue;
-    const n = u32(moov, stts.start + 4); let best = null, frames = 0;
-    for (let i = 0; i < n; i++) { const cnt = u32(moov, stts.start + 8 + i * 8), delta = u32(moov, stts.start + 12 + i * 8); frames += cnt; if (!best || cnt > best.cnt) best = { cnt, delta }; }
-    if (!best || !best.delta) continue;
-    const g = (a, b) => b ? g(b, a % b) : a; const d = g(timescale, best.delta);
-    const num = timescale / d, den = best.delta / d;
-    const info = { fps: den === 1 ? String(num) : `${num}/${den}`, frames, dur: frames * best.delta / timescale, w: 0, h: 0 };
-    if (stsd && u32(moov, stsd.start + 4) >= 1) { const e = stsd.start + 8; info.w = u16(moov, e + 32); info.h = u16(moov, e + 34); }   // 첫 sample entry 의 width/height
-    return info;
-  }
-  return null;
-}
-function readVideoMeta(file) {   // 해상도, 길이 (브라우저 디코더)
-  return new Promise(resolve => {
-    const v = document.createElement('video'); v.preload = 'metadata'; v.muted = true;
-    const url = URL.createObjectURL(file);
-    v.onloadedmetadata = () => { resolve({ w: v.videoWidth, h: v.videoHeight, dur: v.duration }); URL.revokeObjectURL(url); };
-    v.onerror = () => { resolve(null); URL.revokeObjectURL(url); };
-    v.src = url;
-  });
-}
-
 // ---------------------------------------------------------------- 화면
-// 폴더 칸: 따옴표를 벗기고, 탐색기 "경로로 복사"로 얻은 파일 경로면 파일 이름을 떼어 폴더만 쓴다
-const MEDIA_EXT = /\.(mp4|mov|m4v|mkv|webm|avi|png|jpg|jpeg|bmp|gif|webp)$/i;
-function folderValue() {
-  let f = $('folder').value.trim().replace(/^["']+|["']+$/g, '');
-  if (!f) return '';
-  const last = f.split(/[\\/]/).pop();
-  if (MEDIA_EXT.test(last) && f.length > last.length) f = f.slice(0, f.length - last.length);
-  return f.replace(/[\\/]+$/, '');
-}
-function fileArg(name) { const f = folderValue(); if (!f) return name; return f + (f.includes('\\') ? '\\' : '/') + name; }
 function render() {
   const p = state.preset;
-  $('imagePick').style.display = state.source === 'image' ? '' : 'none';
+  $('imagePath').style.display = state.source === 'image' ? '' : 'none';
   if (!p) { $('cmd').textContent = '아래에서 효과를 고르면 명령어가 나옵니다.'; $('cmdJson').textContent = ''; return; }
-  const s = { video: fileArg(state.video || 'slide.mp4'), image: fileArg(state.image || 'prev.png'), out: fileArg($('outName').value.trim() || 'slide_transition.mp4'),
-              w: String(state.w), h: String(state.h), fps: state.fps, encArgs: $('encArgs').value };
+  const video = clean($('videoPath').value), image = clean($('imagePath').value);
+  const s = { video: video || 'slide2.mp4', image: image || 'slide1.png', out: clean($('outPath').value) || autoOut(video || 'slide2.mp4'),
+              w: clean($('w').value) || '1920', h: clean($('h').value) || '1080', fps: clean($('fps').value) || '30', encArgs: $('encArgs').value };
   const args = buildArgs(p, s, state.source);
   $('cmdTitle').textContent = p.label;
-  $('cmdMeta').textContent = `xfade ${p.xfade} · 전환 1초 · 움직임: ${p.easingLabel}` + (state.video ? '' : ' · (영상을 아직 안 골라서 예시 이름을 넣었습니다)') + (state.source === 'image' && !state.image ? ' · (이미지를 아직 안 골랐습니다)' : '');
+  $('cmdMeta').textContent = `xfade ${p.xfade} · 전환 1초 · 움직임: ${p.easingLabel}` + (video ? '' : ' · (영상 경로를 아직 안 넣어서 예시 이름을 넣었습니다)') + (state.source === 'image' && !image ? ' · (이미지 경로를 아직 안 넣었습니다)' : '');
   $('cmd').textContent = oneLine(args);
   $('cmdJson').textContent = JSON.stringify(['ffmpeg', '-y', ...args], null, 2);
 }
@@ -229,28 +167,13 @@ function buildCards() {
   });
 }
 
-$('pickVideo').addEventListener('click', () => $('videoFile').click());
-$('pickImage').addEventListener('click', () => $('imageFile').click());
-$('videoFile').addEventListener('change', async () => {
-  const f = $('videoFile').files[0]; if (!f) return;
-  state.video = f.name; $('videoName').textContent = f.name; $('videoSpec').textContent = '규격 읽는 중...';
-  if (!$('outName').value.trim() || $('outName').dataset.auto === '1') { $('outName').value = f.name.replace(/\.[^.]+$/, '') + '_transition.mp4'; $('outName').dataset.auto = '1'; }
-  let info = null; try { info = await readMp4Info(f); } catch (e) { info = null; }
-  const meta = (info && info.w && info.h) ? null : await readVideoMeta(f);   // MP4 가 아니거나 해상도를 못 읽으면 브라우저 디코더로
-  const w = (info && info.w) || (meta && meta.w) || 1920, h = (info && info.h) || (meta && meta.h) || 1080;
-  const fps = info ? info.fps : null, dur = info ? info.dur : (meta ? meta.dur : null);
-  state.w = w; state.h = h; state.fps = fps || '30'; state.fpsKnown = !!fps;
-  $('videoSpec').textContent = `${w}x${h}` + (dur ? ` · ${dur.toFixed(2)}초` : '') + (fps ? ` · ${fps}fps` : ' · fps를 읽지 못해 30으로 가정 (MP4 가 아닌 파일)');
-  $('videoSpec').className = fps ? 'spec' : 'warn';
+function autoOut(video) { return video.replace(/(\.[^.\\/]+)?$/, '') + '_transition.mp4'; }   // 같은 폴더, _transition 이름
+$('videoPath').addEventListener('input', () => {
+  if (!$('outPath').value.trim() || $('outPath').dataset.auto === '1') { const v = clean($('videoPath').value); $('outPath').value = v ? autoOut(v) : ''; $('outPath').dataset.auto = '1'; }
   render();
 });
-$('imageFile').addEventListener('change', () => { const f = $('imageFile').files[0]; if (!f) return; state.image = f.name; $('imageName').textContent = f.name; render(); });
-$('outName').addEventListener('input', () => { $('outName').dataset.auto = '0'; render(); });
-$('folder').addEventListener('input', () => {
-  const f = folderValue();
-  $('folderHint').textContent = f ? `모든 파일 앞에 붙는 폴더: ${f}` : '비우면 파일 이름만 넣습니다. 그 폴더에서 명령어를 실행하세요.';
-  render();
-});
+$('outPath').addEventListener('input', () => { $('outPath').dataset.auto = $('outPath').value.trim() ? '0' : '1'; render(); });
+['imagePath', 'w', 'h', 'fps'].forEach(id => $(id).addEventListener('input', render));
 $('srcSeg').querySelectorAll('button').forEach(b => b.addEventListener('click', () => { state.source = b.dataset.src; $('srcSeg').querySelectorAll('button').forEach(x => x.classList.toggle('active', x === b)); render(); }));
 $('enc').addEventListener('change', () => { $('encArgs').value = ENCODER_DEFAULTS[$('enc').value]; render(); });
 $('encArgs').addEventListener('input', render);
