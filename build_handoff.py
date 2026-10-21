@@ -21,7 +21,7 @@ import slide_transition as st  # noqa: E402
 BASE = Path(__file__).resolve().parent
 OUT_DIR = BASE / "handoff"
 TMP = sr.WORK / "handoff"
-PW, PH = 480, 270          # 미리보기 크기
+PW, PH = 800, 450          # 미리보기 크기 (팝업에서 크게 보므로 480x270 보다 키움, 짝수 크기)
 PREVIEW_SEC = 2.0          # 전환 1초 + 정지 1초
 EASING_SHORT = {"inout": "부드럽게", "soft": "살짝 부드럽게", "out": "감속", "none": "일정 속도"}
 

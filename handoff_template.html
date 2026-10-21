@@ -8,13 +8,14 @@
   :root { --bg:#f5f6f8; --card:#fff; --line:#e5e7eb; --line2:#cfd4dc; --text:#111827; --muted:#6b7280; --accent:#2563eb; --accent2:#1d4ed8; --soft:#eef4ff; --ok:#059669; }
   * { box-sizing:border-box; }
   body { margin:0; background:var(--bg); color:var(--text); line-height:1.5; font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans KR", "Malgun Gothic", sans-serif; }
-  main { max-width:1080px; margin:0 auto; padding:28px 16px 90px; }
+  body.noscroll { overflow:hidden; }
+  main { max-width:1080px; margin:0 auto; padding:28px 16px 48px; }
   header { margin-bottom:18px; }
   h1 { font-size:1.5rem; margin:0 0 6px; letter-spacing:-.01em; }
   header p { color:var(--muted); margin:0 0 10px; }
   .chips { display:flex; gap:6px; flex-wrap:wrap; }
   .chip { font-size:.78rem; color:#374151; background:#e9ecf1; border-radius:999px; padding:2px 10px; }
-  h2 { font-size:1rem; margin:0 0 10px; display:flex; align-items:baseline; gap:10px; }
+  h2 { font-size:1rem; margin:0 0 10px; display:flex; align-items:baseline; gap:10px; flex-wrap:wrap; }
   h2 .hint { font-weight:400; }
   .hint { color:var(--muted); font-size:.85rem; }
   .card { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:20px 22px; margin:0 0 18px; box-shadow:0 1px 3px rgba(17,24,39,.05); }
@@ -40,21 +41,45 @@
   .fx .t { padding:8px 11px 9px; }
   .fx .n { font-weight:600; font-size:.88rem; }
   .fx .s { font-size:.74rem; color:var(--muted); margin-top:1px; }
-  .cmdbar { position:sticky; bottom:0; background:var(--card); border:1px solid var(--line); border-radius:14px; padding:16px 20px; box-shadow:0 -4px 20px rgba(17,24,39,.08); margin-top:18px; }
-  .cmdhead { display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; }
-  .cmdhead .title { font-weight:700; font-size:1rem; }
-  .cmdhead .meta { color:var(--muted); font-size:.82rem; margin-left:6px; }
+
+  /* 효과 팝업: 큰 미리보기 + 명령어 */
+  .overlay { position:fixed; inset:0; background:rgba(15,23,42,.55); display:none; align-items:center; justify-content:center; padding:16px; z-index:50; }
+  .overlay.open { display:flex; }
+  /* 폭은 화면 높이에 맞춰 줄여서(영상 16:9 + 명령어 약 370px) 스크롤 없이 명령어까지 보이게 */
+  .dialog { background:var(--card); border-radius:16px; width:min(900px, 100%, max(540px, calc((100vh - 370px) * 16 / 9))); max-height:calc(100vh - 32px); overflow:auto; box-shadow:0 20px 60px rgba(0,0,0,.35); animation: pop .15s ease-out; }
+  @keyframes pop { from { transform:scale(.97); opacity:0; } to { transform:none; opacity:1; } }
+  .dhead { display:flex; align-items:center; gap:8px; padding:12px 14px 12px 18px; border-bottom:1px solid var(--line); position:sticky; top:0; background:var(--card); z-index:1; }
+  .dhead .who { flex:1; min-width:0; }
+  .dhead .title { font-weight:700; font-size:1.05rem; }
+  .dhead .meta { color:var(--muted); font-size:.82rem; }
+  button.ghost { font:inherit; font-size:.85rem; padding:6px 11px; border-radius:8px; border:1px solid var(--line2); background:#fff; color:var(--text); cursor:pointer; white-space:nowrap; }
+  button.ghost:hover { background:#f3f4f6; }
+  button.x { width:34px; height:34px; padding:0; border-radius:50%; border:0; background:transparent; font-size:1.5rem; line-height:1; color:var(--muted); cursor:pointer; margin-left:4px; }
+  button.x:hover { background:#f3f4f6; color:var(--text); }
+  .dbody { padding:16px 18px 18px; }
+  .dialog video { width:100%; aspect-ratio:16/9; display:block; background:#000; border-radius:10px; cursor:pointer; }
+  .dialog .vhint { color:var(--muted); font-size:.78rem; margin:6px 0 0; text-align:right; }
+  .cmdhead { display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; margin-top:14px; }
+  .cmdhead .label { font-weight:600; font-size:.92rem; }
+  .cmdhead .label .sub { font-weight:400; color:var(--muted); font-size:.82rem; margin-left:6px; }
   .actions { display:flex; gap:8px; align-items:center; }
   select { font:inherit; font-size:.88rem; padding:7px 9px; border:1px solid var(--line2); border-radius:9px; background:#fff; }
   button.copy { font:inherit; font-weight:600; padding:9px 18px; border-radius:9px; border:1px solid var(--accent); background:var(--accent); color:#fff; cursor:pointer; transition: background .12s; }
   button.copy:hover { background:var(--accent2); }
   button.copy.done { background:var(--ok); border-color:var(--ok); }
-  pre { background:#0f172a; color:#e2e8f0; padding:12px 14px; border-radius:10px; overflow:auto; font-size:.8rem; line-height:1.5; white-space:pre-wrap; word-break:break-all; margin:12px 0 0; }
+  pre { background:#0f172a; color:#e2e8f0; padding:12px 14px; border-radius:10px; overflow:auto; font-size:.8rem; line-height:1.5; white-space:pre-wrap; word-break:break-all; margin:10px 0 0; }
   details { margin-top:10px; }
   details summary { cursor:pointer; color:var(--muted); font-size:.85rem; }
   details .in { padding:8px 0 0; font-size:.86rem; color:var(--muted); line-height:1.55; }
   details .in div { margin:4px 0; }
   code { background:#eef2f7; padding:1px 5px; border-radius:4px; font-size:.86em; color:var(--text); }
+  @media (max-width: 600px) { .overlay { padding:8px; } .dialog { max-height:calc(100vh - 16px); } .dhead .nav { display:none; } }
+  /* 넓지만 낮은 화면(노트북)에서는 영상 | 명령어 2단으로 두어 스크롤 없이 둘 다 보이게 */
+  @media (min-width: 1100px) and (max-height: 840px) {
+    .dialog { width:min(1180px, 100%); }
+    .dbody { display:grid; grid-template-columns: minmax(0, 11fr) minmax(0, 10fr); gap:4px 20px; align-items:start; }
+    .cmdhead { margin-top:0; }
+  }
 </style>
 </head>
 <body>
@@ -87,30 +112,46 @@
   </section>
 
   <section>
-    <h2>효과 선택 <span class="hint">카드에 마우스를 올리면 미리보기가 재생됩니다</span></h2>
+    <h2>효과 선택 <span class="hint">마우스를 올리면 미리보기가 재생되고, 클릭하면 크게 보기와 명령어가 열립니다</span></h2>
     <div class="cards" id="cards"></div>
   </section>
+</main>
 
-  <section class="cmdbar" id="cmdBox">
-    <div class="cmdhead">
-      <div><span class="title" id="cmdTitle">효과를 고르세요</span><span class="meta" id="cmdMeta"></span></div>
-      <div class="actions">
-        <select id="enc" title="인코더"><option value="libopenh264">libopenh264 (LGPL)</option><option value="libx264">libx264</option></select>
-        <button type="button" class="copy" id="copyBtn">명령어 복사</button>
+<div class="overlay" id="modal" role="dialog" aria-modal="true" aria-labelledby="cmdTitle">
+  <div class="dialog" id="dialog">
+    <div class="dhead">
+      <div class="who"><div class="title" id="cmdTitle"></div><div class="meta" id="cmdMeta"></div></div>
+      <button type="button" class="ghost nav" id="prevBtn" title="이전 효과 (←)">‹ 이전</button>
+      <button type="button" class="ghost nav" id="nextBtn" title="다음 효과 (→)">다음 ›</button>
+      <button type="button" class="x" id="closeBtn" title="닫기 (Esc)" aria-label="닫기">×</button>
+    </div>
+    <div class="dbody">
+      <div class="pv">
+        <video id="modalVideo" muted loop playsinline autoplay title="클릭하면 처음부터 다시 재생"></video>
+        <div class="vhint">샘플 슬라이드 1 → 2 · 전환 1초 · 반복 재생 · 클릭하면 처음부터</div>
+      </div>
+      <div class="cm">
+      <div class="cmdhead">
+        <div class="label">ffmpeg 명령어<span class="sub" id="cmdNote"></span></div>
+        <div class="actions">
+          <select id="enc" title="인코더"><option value="libopenh264">libopenh264 (LGPL)</option><option value="libx264">libx264</option></select>
+          <button type="button" class="copy" id="copyBtn">명령어 복사</button>
+        </div>
+      </div>
+      <pre id="cmd"></pre>
+      <details><summary>코드용 인자 배열(JSON)과 설명</summary>
+        <div class="in">
+          <div>구조: 앞 그림 1초 + 영상의 처음 1초를 <code>xfade</code>(offset 0)로 겹치고 나머지와 <code>concat</code>. 1 + D − 1 = D 라서 프레임 수가 원본과 같습니다. 움직임이 있는 효과는 전환 구간을 fps의 4배로 뽑은 뒤 <code>setpts</code>로 속도 곡선을 넣습니다. 음성은 <code>-c:a copy</code>.</div>
+          <div>영상 규격은 1920×1080, 30fps 로 고정되어 있습니다. 다른 규격의 영상이면 이 파일의 <code>SPEC</code> 값을 고치세요. 영상이 1초 이하면 전환 뒤에 남는 구간이 없어 출력이 짧아지므로, 코드에서는 길이를 먼저 확인하세요.</div>
+          <div>libopenh264 는 빌드에 따라 <code>-profile:v high</code>, <code>-rc_mode quality</code> 옵션을 지원합니다 (<code>ffmpeg -h encoder=libopenh264</code> 로 확인). 원본과 같은 프로파일이 필요하면 인코더 옵션에 추가하세요.</div>
+          <div>인코더 옵션: <input type="text" id="encArgs" style="margin-top:4px"></div>
+          <pre id="cmdJson"></pre>
+        </div>
+      </details>
       </div>
     </div>
-    <pre id="cmd"></pre>
-    <details><summary>코드용 인자 배열(JSON)과 설명</summary>
-      <div class="in">
-        <div>구조: 앞 그림 1초 + 영상의 처음 1초를 <code>xfade</code>(offset 0)로 겹치고 나머지와 <code>concat</code>. 1 + D − 1 = D 라서 프레임 수가 원본과 같습니다. 움직임이 있는 효과는 전환 구간을 fps의 4배로 뽑은 뒤 <code>setpts</code>로 속도 곡선을 넣습니다. 음성은 <code>-c:a copy</code>.</div>
-        <div>영상 규격은 1920×1080, 30fps 로 고정되어 있습니다. 다른 규격의 영상이면 이 파일의 <code>SPEC</code> 값을 고치세요. 영상이 1초 이하면 전환 뒤에 남는 구간이 없어 출력이 짧아지므로, 코드에서는 길이를 먼저 확인하세요.</div>
-        <div>libopenh264 는 빌드에 따라 <code>-profile:v high</code>, <code>-rc_mode quality</code> 옵션을 지원합니다 (<code>ffmpeg -h encoder=libopenh264</code> 로 확인). 원본과 같은 프로파일이 필요하면 인코더 옵션에 추가하세요.</div>
-        <div>인코더 옵션: <input type="text" id="encArgs" style="margin-top:4px"></div>
-        <pre id="cmdJson"></pre>
-      </div>
-    </details>
-  </section>
-</main>
+  </div>
+</div>
 
 <script>
 const DATA = __DATA__;
@@ -165,7 +206,7 @@ function render() {
   $('srcHelp').textContent = state.source === 'image'
     ? '바로 앞 슬라이드를 PNG/JPG 로 내보낸 파일. 영상의 처음 1초 동안 이 그림에서 영상으로 바뀝니다.'
     : '첫 슬라이드는 앞 슬라이드가 없으므로 검정 화면에서 영상으로 바뀝니다.';
-  if (!p) { $('cmd').textContent = '효과를 고르면 명령어가 나옵니다.'; $('cmdJson').textContent = ''; return; }
+  if (!p) return;
   const video = clean($('videoPath').value), image = clean($('imagePath').value);
   let out = clean($('outPath').value) || autoOut(video || 'slide2.mp4'), warn = '';
   if (video && out.toLowerCase() === video.toLowerCase()) { out = autoOut(video); warn = ' · 출력이 입력 영상과 같아서 자동 이름으로 바꿨습니다'; }
@@ -173,26 +214,47 @@ function render() {
               w: SPEC.w, h: SPEC.h, fps: SPEC.fps, encArgs: $('encArgs').value };
   const args = buildArgs(p, s, state.source);
   $('cmdTitle').textContent = p.label;
-  $('cmdMeta').textContent = `xfade ${p.xfade} · ${p.easingLabel}` + (video ? '' : ' · 영상 경로를 넣으면 예시 이름이 바뀝니다') + warn;
+  $('cmdMeta').textContent = `xfade ${p.xfade} · ${p.easingLabel} · ` + (state.source === 'image' ? '앞 슬라이드 이미지에서 시작' : '검정 화면에서 시작');
+  $('cmdNote').textContent = (video ? '' : '영상 경로를 넣으면 예시 이름이 바뀝니다') + warn;
   $('cmd').textContent = oneLine(args);
   $('cmdJson').textContent = JSON.stringify(['ffmpeg', '-y', ...args], null, 2);
+}
+
+// ---------------------------------------------------------------- 효과 팝업
+function openModal(p) {
+  state.preset = p;
+  document.querySelectorAll('.fx').forEach(x => x.classList.toggle('selected', x.dataset.key === p.key));
+  document.querySelectorAll('.fx video').forEach(o => { o.pause(); o.currentTime = 0; });
+  const v = $('modalVideo');
+  v.innerHTML = `<source src="${p.preview}" type="video/mp4"><source src="${p.previewWebm}" type="video/webm">`;
+  v.load(); v.play().catch(() => {});
+  render();
+  $('modal').classList.add('open'); document.body.classList.add('noscroll');
+  $('closeBtn').focus();
+}
+function closeModal() {
+  if (!$('modal').classList.contains('open')) return;
+  $('modal').classList.remove('open'); document.body.classList.remove('noscroll');
+  $('modalVideo').pause();
+  const sel = document.querySelector('.fx.selected'); if (sel) sel.focus();
+}
+function stepPreset(d) {
+  const n = DATA.presets.length, i = DATA.presets.findIndex(x => x.key === state.preset.key);
+  openModal(DATA.presets[(i + d + n) % n]);
 }
 
 function buildCards() {
   const box = $('cards');
   DATA.presets.forEach(p => {
-    const el = document.createElement('div'); el.className = 'fx'; el.dataset.key = p.key;
-    el.innerHTML = `<video muted loop playsinline preload="metadata"><source src="${p.preview}" type="video/mp4"><source src="${p.previewWebm}" type="video/webm"></video>
+    const el = document.createElement('div'); el.className = 'fx'; el.dataset.key = p.key; el.tabIndex = 0;
+    el.setAttribute('role', 'button'); el.setAttribute('aria-label', `${p.label} 크게 보기`);
+    el.innerHTML = `<video muted loop playsinline preload="auto"><source src="${p.preview}" type="video/mp4"><source src="${p.previewWebm}" type="video/webm"></video>
       <div class="t"><div class="n">${p.label}</div><div class="s">${p.xfade} · ${p.easingShort}</div></div>`;
     const v = el.querySelector('video');
     el.addEventListener('mouseenter', () => v.play().catch(() => {}));
     el.addEventListener('mouseleave', () => { v.pause(); v.currentTime = 0; });
-    el.addEventListener('click', () => {
-      state.preset = p; document.querySelectorAll('.fx').forEach(x => x.classList.toggle('selected', x.dataset.key === p.key));
-      document.querySelectorAll('.fx video').forEach(o => { if (o !== v) { o.pause(); o.currentTime = 0; } });
-      v.currentTime = 0; v.play().catch(() => {});
-      render();
-    });
+    el.addEventListener('click', () => openModal(p));
+    el.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openModal(p); } });
     box.appendChild(el);
   });
 }
@@ -212,9 +274,20 @@ $('copyBtn').addEventListener('click', async () => {
   catch { const ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); }
   btn.textContent = '복사됨'; btn.classList.add('done'); setTimeout(() => { btn.textContent = '명령어 복사'; btn.classList.remove('done'); }, 1200);
 });
+$('closeBtn').addEventListener('click', closeModal);
+$('prevBtn').addEventListener('click', () => stepPreset(-1));
+$('nextBtn').addEventListener('click', () => stepPreset(1));
+$('modal').addEventListener('click', (e) => { if (e.target === $('modal')) closeModal(); });   // 바깥(어두운 부분) 클릭으로 닫기
+$('modalVideo').addEventListener('click', () => { const v = $('modalVideo'); v.currentTime = 0; v.play().catch(() => {}); });
+document.addEventListener('keydown', (e) => {
+  if (!$('modal').classList.contains('open')) return;
+  if (e.key === 'Escape') { closeModal(); return; }
+  if (['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName)) return;   // 입력 중에는 방향키로 넘기지 않음
+  if (e.key === 'ArrowLeft') stepPreset(-1);
+  if (e.key === 'ArrowRight') stepPreset(1);
+});
 $('encArgs').value = ENCODER_DEFAULTS.libopenh264;
 buildCards();
-state.preset = DATA.presets[0]; document.querySelector('.fx').classList.add('selected');
 render();
 </script>
 </body>
