@@ -26,10 +26,10 @@
 3. 전환 1초 고정, 움직임은 효과별 자동. 영상 규격은 1920x1080, 30fps 로 고정이다 (`handoff_template.html` 의 `SPEC`). 인코더는 libopenh264 기본, libx264 선택 가능.
 
 - 다시 만들기: `python3 build_handoff.py` (미리보기 캐시 재사용, `--rebuild` 로 전부 다시)
-- 테스트용 슬라이드 이미지: `samples/slide1.png`, `samples/slide2.png` (1920x1080, 자막 없음, 왼쪽 띠 없음).
-  부제가 "video emphasis effect demo" 인 버전은 `samples/slide1_emphasis.png`, `samples/slide2_emphasis.png`.
-  번호 없이 제목이 "Slide" 인 한 장은 `samples/slide_emphasis.png`.
-  예: slide2 영상을 만든 뒤 앞 슬라이드로 `samples/slide1.png` 를 넣어 보면 된다.
+- 테스트용 슬라이드 이미지: `samples/transition_slide1.png`, `samples/transition_slide2.png` (1920x1080, 자막 없음, 왼쪽 띠 없음).
+  부제가 "video emphasis effect demo" 인 버전은 `samples/emphasis_slide1.png`, `samples/emphasis_slide2.png`.
+  번호 없이 제목이 "Slide" 인 한 장은 `samples/emphasis_slide.png`.
+  예: slide2 영상을 만든 뒤 앞 슬라이드로 `samples/transition_slide1.png` 를 넣어 보면 된다.
 - 페이지가 만드는 인자 목록은 `slide_transition.build_apply_command` 와 동일하다 (테스트로 확인).
 
 ## 준비
