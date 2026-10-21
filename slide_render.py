@@ -203,12 +203,15 @@ def build_render_command(image: Path, duration: float, out: Path,
                 "-t", f"{d:.4f}", *_encode_args(out)]
 
     xf, def_dur, def_ease, _ = resolve_transition(transition)
-    t = snap(tdur if tdur is not None else def_dur, fps)
+    requested = tdur if tdur is not None else def_dur
+    if not 0 < requested <= MAX_TRANSITION + 1e-9:
+        raise ValueError(f"전환 길이는 0 초과 {MAX_TRANSITION}초 이하여야 합니다")
+    t = snap(requested, fps)
+    if t <= 0:
+        raise ValueError("전환 길이가 한 프레임보다 짧습니다")
     easing = easing or def_ease
     if easing not in EASINGS:
-        raise ValueError("움직임(easing)은 inout / out / none 중 하나")
-    if not 0 < t <= MAX_TRANSITION + 1e-9:
-        raise ValueError(f"전환 길이는 0 초과 {MAX_TRANSITION}초 이하여야 합니다")
+        raise ValueError("움직임(easing)은 inout / soft / out / none 중 하나")
     if t >= d:
         raise ValueError("전환 길이는 슬라이드 길이보다 짧아야 합니다")
 

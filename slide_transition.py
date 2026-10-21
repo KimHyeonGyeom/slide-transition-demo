@@ -185,12 +185,15 @@ def build_apply_command(info: VideoInfo, prev: str, transition: str, out: Path,
     f, fs = info.fps, fps_str(info.fps)
     w, h = info.width, info.height
     xf, def_dur, def_ease, _ = resolve_transition(transition)
-    t = snap(tdur if tdur is not None else def_dur, f)
+    requested = tdur if tdur is not None else def_dur
+    if not 0 < requested <= MAX_TRANSITION + 1e-9:
+        raise ValueError(f"전환 길이는 0 초과 {MAX_TRANSITION}초 이하여야 합니다")
+    t = snap(requested, f)          # 프레임 단위 반올림 (29.97fps 면 1.0초 -> 30프레임 = 1.001초)
+    if t <= 0:
+        raise ValueError("전환 길이가 한 프레임보다 짧습니다")
     easing = easing or def_ease
     if easing not in EASINGS:
         raise ValueError("움직임(easing)은 inout / soft / out / none 중 하나")
-    if not 0 < t <= MAX_TRANSITION + 1e-9:
-        raise ValueError(f"전환 길이는 0 초과 {MAX_TRANSITION}초 이하여야 합니다")
     if t >= info.duration:
         raise ValueError(f"전환 길이가 영상 길이({info.duration:.2f}s)보다 길거나 같습니다")
     if prev not in START_COLORS and not Path(prev).exists():
@@ -248,6 +251,7 @@ def verify(original: Path, output: Path) -> dict:
         ("fps", fps_str(a.fps), fps_str(b.fps)),
         ("프레임 수", str(a.nb_frames), str(b.nb_frames)),
         ("영상 길이", f"{a.duration:.3f}s", f"{b.duration:.3f}s"),
+        ("픽셀 포맷", a.pix_fmt, b.pix_fmt),
         ("오디오 스트림", a.audio or "없음", b.audio or "없음"),
         ("오디오 데이터 md5", ma or "없음", mb or "없음"),
     ]

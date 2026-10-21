@@ -70,7 +70,7 @@
       <div class="field">
         <label for="videoPath">슬라이드 영상</label>
         <input type="text" id="videoPath" placeholder="C:\slides\slide2.mp4" spellcheck="false">
-        <div class="help">탐색기에서 파일을 Shift + 우클릭 → "경로로 복사" → 붙여넣기. 따옴표는 자동으로 빠집니다.</div>
+        <div class="help">탐색기에서 파일을 Shift + 우클릭 → "경로로 복사" → 붙여넣기. 따옴표는 자동으로 빠집니다. 영상은 1초보다 길어야 합니다.</div>
       </div>
       <div class="field">
         <label for="outPath">출력 파일</label>
@@ -103,7 +103,8 @@
     <details><summary>코드용 인자 배열(JSON)과 설명</summary>
       <div class="in">
         <div>구조: 앞 그림 1초 + 영상의 처음 1초를 <code>xfade</code>(offset 0)로 겹치고 나머지와 <code>concat</code>. 1 + D − 1 = D 라서 프레임 수가 원본과 같습니다. 움직임이 있는 효과는 전환 구간을 fps의 4배로 뽑은 뒤 <code>setpts</code>로 속도 곡선을 넣습니다. 음성은 <code>-c:a copy</code>.</div>
-        <div>영상 규격은 1920×1080, 30fps 로 고정되어 있습니다. 다른 규격의 영상이면 이 파일의 <code>SPEC</code> 값을 고치세요.</div>
+        <div>영상 규격은 1920×1080, 30fps 로 고정되어 있습니다. 다른 규격의 영상이면 이 파일의 <code>SPEC</code> 값을 고치세요. 영상이 1초 이하면 전환 뒤에 남는 구간이 없어 출력이 짧아지므로, 코드에서는 길이를 먼저 확인하세요.</div>
+        <div>libopenh264 는 빌드에 따라 <code>-profile:v high</code>, <code>-rc_mode quality</code> 옵션을 지원합니다 (<code>ffmpeg -h encoder=libopenh264</code> 로 확인). 원본과 같은 프로파일이 필요하면 인코더 옵션에 추가하세요.</div>
         <div>인코더 옵션: <input type="text" id="encArgs" style="margin-top:4px"></div>
         <pre id="cmdJson"></pre>
       </div>
@@ -166,11 +167,13 @@ function render() {
     : '첫 슬라이드는 앞 슬라이드가 없으므로 검정 화면에서 영상으로 바뀝니다.';
   if (!p) { $('cmd').textContent = '효과를 고르면 명령어가 나옵니다.'; $('cmdJson').textContent = ''; return; }
   const video = clean($('videoPath').value), image = clean($('imagePath').value);
-  const s = { video: video || 'slide2.mp4', image: image || 'slide1.png', out: clean($('outPath').value) || autoOut(video || 'slide2.mp4'),
+  let out = clean($('outPath').value) || autoOut(video || 'slide2.mp4'), warn = '';
+  if (video && out.toLowerCase() === video.toLowerCase()) { out = autoOut(video); warn = ' · 출력이 입력 영상과 같아서 자동 이름으로 바꿨습니다'; }
+  const s = { video: video || 'slide2.mp4', image: image || 'slide1.png', out,
               w: SPEC.w, h: SPEC.h, fps: SPEC.fps, encArgs: $('encArgs').value };
   const args = buildArgs(p, s, state.source);
   $('cmdTitle').textContent = p.label;
-  $('cmdMeta').textContent = `xfade ${p.xfade} · ${p.easingLabel}` + (video ? '' : ' · 영상 경로를 넣으면 예시 이름이 바뀝니다');
+  $('cmdMeta').textContent = `xfade ${p.xfade} · ${p.easingLabel}` + (video ? '' : ' · 영상 경로를 넣으면 예시 이름이 바뀝니다') + warn;
   $('cmd').textContent = oneLine(args);
   $('cmdJson').textContent = JSON.stringify(['ffmpeg', '-y', ...args], null, 2);
 }
@@ -184,7 +187,12 @@ function buildCards() {
     const v = el.querySelector('video');
     el.addEventListener('mouseenter', () => v.play().catch(() => {}));
     el.addEventListener('mouseleave', () => { v.pause(); v.currentTime = 0; });
-    el.addEventListener('click', () => { state.preset = p; document.querySelectorAll('.fx').forEach(x => x.classList.toggle('selected', x.dataset.key === p.key)); render(); });
+    el.addEventListener('click', () => {
+      state.preset = p; document.querySelectorAll('.fx').forEach(x => x.classList.toggle('selected', x.dataset.key === p.key));
+      document.querySelectorAll('.fx video').forEach(o => { if (o !== v) { o.pause(); o.currentTime = 0; } });
+      v.currentTime = 0; v.play().catch(() => {});
+      render();
+    });
     box.appendChild(el);
   });
 }
