@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>슬라이드 전환 명령어</title>
 <style>
-  :root { --bg:#f5f6f8; --card:#fff; --line:#e5e7eb; --line2:#cfd4dc; --text:#111827; --muted:#6b7280; --accent:#2563eb; --accent2:#1d4ed8; --soft:#eef4ff; --ok:#059669; }
+  :root { --bg:#f5f6f8; --card:#fff; --line:#e5e7eb; --line2:#cfd4dc; --text:#111827; --muted:#6b7280; --accent:#2563eb; --accent2:#1d4ed8; --soft:#eef4ff; --ok:#059669; --bad:#dc2626; }
   * { box-sizing:border-box; }
   body { margin:0; background:var(--bg); color:var(--text); line-height:1.5; font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans KR", "Malgun Gothic", sans-serif; }
   body.noscroll { overflow:hidden; }
@@ -18,21 +18,6 @@
   h2 { font-size:1rem; margin:0 0 10px; display:flex; align-items:baseline; gap:10px; flex-wrap:wrap; }
   h2 .hint { font-weight:400; }
   .hint { color:var(--muted); font-size:.85rem; }
-  .card { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:20px 22px; margin:0 0 18px; box-shadow:0 1px 3px rgba(17,24,39,.05); }
-  .form { display:grid; grid-template-columns: 1fr 1fr; gap:16px 22px; }
-  @media (max-width: 760px) { .form { grid-template-columns: 1fr; } }
-  .field { display:flex; flex-direction:column; gap:6px; }
-  .field.wide { grid-column: 1 / -1; }
-  .field label { font-weight:600; font-size:.9rem; }
-  .field .help { color:var(--muted); font-size:.8rem; line-height:1.4; }
-  input[type=text] { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size:.9rem; padding:9px 11px; border:1px solid var(--line2); border-radius:9px; width:100%; background:#fff; transition: border-color .12s, box-shadow .12s; }
-  input[type=text]:focus { outline:none; border-color:var(--accent); box-shadow:0 0 0 3px rgba(37,99,235,.15); }
-  input[type=text]::placeholder { color:#9ca3af; font-family: inherit; }
-  .seg { display:inline-flex; border:1px solid var(--line2); border-radius:9px; overflow:hidden; width:max-content; }
-  .seg button { background:#fff; color:var(--text); border:0; border-right:1px solid var(--line2); padding:8px 14px; font:inherit; font-size:.9rem; font-weight:500; cursor:pointer; }
-  .seg button:last-child { border-right:0; }
-  .seg button:hover:not(.active) { background:#f3f4f6; }
-  .seg button.active { background:var(--accent); color:#fff; }
   .cards { display:grid; grid-template-columns: repeat(auto-fill, minmax(168px, 1fr)); gap:12px; }
   .fx { border:1px solid var(--line); border-radius:12px; overflow:hidden; background:#fff; cursor:pointer; transition: transform .12s, box-shadow .15s, border-color .15s; }
   .fx:hover { box-shadow:0 4px 14px rgba(17,24,39,.08); transform: translateY(-1px); }
@@ -42,11 +27,10 @@
   .fx .n { font-weight:600; font-size:.88rem; }
   .fx .s { font-size:.74rem; color:var(--muted); margin-top:1px; }
 
-  /* 효과 팝업: 큰 미리보기 + 명령어 */
+  /* 효과 팝업: 큰 미리보기 + 경로 입력 + 명령어 */
   .overlay { position:fixed; inset:0; background:rgba(15,23,42,.55); display:none; align-items:center; justify-content:center; padding:16px; z-index:50; }
   .overlay.open { display:flex; }
-  /* 폭은 화면 높이에 맞춰 줄여서(영상 16:9 + 명령어 약 370px) 스크롤 없이 명령어까지 보이게 */
-  .dialog { background:var(--card); border-radius:16px; width:min(900px, 100%, max(540px, calc((100vh - 370px) * 16 / 9))); max-height:calc(100vh - 32px); overflow:auto; box-shadow:0 20px 60px rgba(0,0,0,.35); animation: pop .15s ease-out; }
+  .dialog { background:var(--card); border-radius:16px; width:min(900px, 100%); max-height:calc(100vh - 32px); overflow:auto; box-shadow:0 20px 60px rgba(0,0,0,.35); animation: pop .15s ease-out; }
   @keyframes pop { from { transform:scale(.97); opacity:0; } to { transform:none; opacity:1; } }
   .dhead { display:flex; align-items:center; gap:8px; padding:12px 14px 12px 18px; border-bottom:1px solid var(--line); position:sticky; top:0; background:var(--card); z-index:1; }
   .dhead .who { flex:1; min-width:0; }
@@ -58,27 +42,46 @@
   button.x:hover { background:#f3f4f6; color:var(--text); }
   .dbody { padding:16px 18px 18px; }
   .dialog video { width:100%; aspect-ratio:16/9; display:block; background:#000; border-radius:10px; cursor:pointer; }
-  .dialog .vhint { color:var(--muted); font-size:.78rem; margin:6px 0 0; text-align:right; }
-  .cmdhead { display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; margin-top:14px; }
+  .dialog .vhint { color:var(--muted); font-size:.78rem; margin:6px 0 14px; text-align:right; }
+  .fields { display:grid; gap:12px; }
+  .field { display:flex; flex-direction:column; gap:5px; min-width:0; }
+  .field label { font-weight:600; font-size:.88rem; display:flex; align-items:center; gap:6px; }
+  .req { font-weight:600; font-size:.68rem; color:var(--accent); background:var(--soft); border-radius:999px; padding:1px 7px; }
+  .field .help { color:var(--muted); font-size:.78rem; line-height:1.4; }
+  .field .err { display:none; color:var(--bad); font-size:.8rem; font-weight:500; }
+  .field.invalid .err { display:block; }
+  .field.invalid input[type=text] { border-color:var(--bad); box-shadow:0 0 0 3px rgba(220,38,38,.15); }
+  input[type=text] { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size:.88rem; padding:8px 11px; border:1px solid var(--line2); border-radius:9px; width:100%; background:#fff; transition: border-color .12s, box-shadow .12s; }
+  input[type=text]:focus { outline:none; border-color:var(--accent); box-shadow:0 0 0 3px rgba(37,99,235,.15); }
+  input[type=text]::placeholder { color:#9ca3af; font-family: inherit; }
+  .seg { display:inline-flex; border:1px solid var(--line2); border-radius:9px; overflow:hidden; width:max-content; max-width:100%; }
+  .seg button { background:#fff; color:var(--text); border:0; border-right:1px solid var(--line2); padding:7px 13px; font:inherit; font-size:.86rem; font-weight:500; cursor:pointer; }
+  .seg button:last-child { border-right:0; }
+  .seg button:hover:not(.active) { background:#f3f4f6; }
+  .seg button.active { background:var(--accent); color:#fff; }
+  .cmdhead { display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; margin-top:16px; }
   .cmdhead .label { font-weight:600; font-size:.92rem; }
-  .cmdhead .label .sub { font-weight:400; color:var(--muted); font-size:.82rem; margin-left:6px; }
+  .cmdhead .label .sub { font-weight:400; color:var(--muted); font-size:.8rem; margin-left:6px; }
   .actions { display:flex; gap:8px; align-items:center; }
   select { font:inherit; font-size:.88rem; padding:7px 9px; border:1px solid var(--line2); border-radius:9px; background:#fff; }
   button.copy { font:inherit; font-weight:600; padding:9px 18px; border-radius:9px; border:1px solid var(--accent); background:var(--accent); color:#fff; cursor:pointer; transition: background .12s; }
   button.copy:hover { background:var(--accent2); }
   button.copy.done { background:var(--ok); border-color:var(--ok); }
   pre { background:#0f172a; color:#e2e8f0; padding:12px 14px; border-radius:10px; overflow:auto; font-size:.8rem; line-height:1.5; white-space:pre-wrap; word-break:break-all; margin:10px 0 0; }
+  pre mark { background:#fde68a; color:#1f2937; border-radius:3px; padding:0 3px; }   /* 아직 안 넣은 경로 자리표시 */
   details { margin-top:10px; }
   details summary { cursor:pointer; color:var(--muted); font-size:.85rem; }
   details .in { padding:8px 0 0; font-size:.86rem; color:var(--muted); line-height:1.55; }
   details .in div { margin:4px 0; }
   code { background:#eef2f7; padding:1px 5px; border-radius:4px; font-size:.86em; color:var(--text); }
   @media (max-width: 600px) { .overlay { padding:8px; } .dialog { max-height:calc(100vh - 16px); } .dhead .nav { display:none; } }
-  /* 넓지만 낮은 화면(노트북)에서는 영상 | 명령어 2단으로 두어 스크롤 없이 둘 다 보이게 */
-  @media (min-width: 1100px) and (max-height: 840px) {
-    .dialog { width:min(1180px, 100%); }
-    .dbody { display:grid; grid-template-columns: minmax(0, 11fr) minmax(0, 10fr); gap:4px 20px; align-items:start; }
-    .cmdhead { margin-top:0; }
+  /* 세로로 쌓이는 폭에서는 입력을 두 칸으로 */
+  @media (min-width: 640px) and (max-width: 1099px) { .fields { grid-template-columns: 1fr 1fr; } .field.wide { grid-column: 1 / -1; } .field.out { grid-column: 2; grid-row: 1; } }
+  /* 넓은 화면에서는 영상 | 입력 + 명령어 2단 */
+  @media (min-width: 1100px) {
+    .dialog { width:min(1400px, 100%); }
+    .dbody { display:grid; grid-template-columns: minmax(0, 11fr) minmax(0, 10fr); gap:4px 22px; align-items:start; }
+    .dialog .vhint { margin-bottom:0; }
   }
 </style>
 </head>
@@ -90,29 +93,8 @@
     <div class="chips"><span class="chip">규격 1920×1080 · 30fps</span><span class="chip">전환 1초</span><span class="chip">움직임 효과별 자동</span><span class="chip">음성 복사</span></div>
   </header>
 
-  <section class="card">
-    <div class="form">
-      <div class="field">
-        <label for="videoPath">슬라이드 영상</label>
-        <input type="text" id="videoPath" placeholder="C:\slides\slide2.mp4" spellcheck="false">
-        <div class="help">탐색기에서 파일을 Shift + 우클릭 → "경로로 복사" → 붙여넣기. 따옴표는 자동으로 빠집니다. 영상은 1초보다 길어야 합니다.</div>
-      </div>
-      <div class="field">
-        <label for="outPath">출력 파일</label>
-        <input type="text" id="outPath" placeholder="영상 경로를 넣으면 자동으로 채워집니다" spellcheck="false">
-        <div class="help">같은 폴더에 "_transition" 이름으로 만들어집니다. 원하면 바꾸세요.</div>
-      </div>
-      <div class="field wide">
-        <label>앞 슬라이드</label>
-        <div class="seg" id="srcSeg"><button data-src="image" class="active">이미지 사용</button><button data-src="black">첫 슬라이드 (검정 화면에서 시작)</button></div>
-        <input type="text" id="imagePath" placeholder="C:\slides\slide1.png" spellcheck="false" style="margin-top:4px">
-        <div class="help" id="srcHelp">바로 앞 슬라이드를 PNG/JPG 로 내보낸 파일. 영상의 처음 1초 동안 이 그림에서 영상으로 바뀝니다.</div>
-      </div>
-    </div>
-  </section>
-
   <section>
-    <h2>효과 선택 <span class="hint">마우스를 올리면 미리보기가 재생되고, 클릭하면 크게 보기와 명령어가 열립니다</span></h2>
+    <h2>효과 선택 <span class="hint">마우스를 올리면 미리보기가 재생되고, 클릭하면 크게 보고 경로를 넣어 명령어를 복사합니다</span></h2>
     <div class="cards" id="cards"></div>
   </section>
 </main>
@@ -131,23 +113,43 @@
         <div class="vhint">샘플 슬라이드 1 → 2 · 전환 1초 · 반복 재생 · 클릭하면 처음부터</div>
       </div>
       <div class="cm">
-      <div class="cmdhead">
-        <div class="label">ffmpeg 명령어<span class="sub" id="cmdNote"></span></div>
-        <div class="actions">
-          <select id="enc" title="인코더"><option value="libopenh264">libopenh264 (LGPL)</option><option value="libx264">libx264</option></select>
-          <button type="button" class="copy" id="copyBtn">명령어 복사</button>
+        <div class="fields">
+          <div class="field">
+            <label for="videoPath">슬라이드 영상 <span class="req">필수</span></label>
+            <input type="text" id="videoPath" placeholder="C:\slides\slide2.mp4" spellcheck="false" autocomplete="off">
+            <div class="help">탐색기에서 파일을 Shift + 우클릭 → "경로로 복사" → 붙여넣기. 따옴표는 자동으로 빠집니다.</div>
+            <div class="err">슬라이드 영상 경로를 넣어주세요.</div>
+          </div>
+          <div class="field wide">
+            <label>앞 슬라이드 <span class="req" id="imageReq">필수</span></label>
+            <div class="seg" id="srcSeg"><button type="button" data-src="image" class="active">이미지 사용</button><button type="button" data-src="black">첫 슬라이드 (검정 화면에서 시작)</button></div>
+            <input type="text" id="imagePath" placeholder="C:\slides\slide1.png" spellcheck="false" autocomplete="off" style="margin-top:3px">
+            <div class="help" id="srcHelp">바로 앞 슬라이드를 PNG/JPG 로 내보낸 파일. 영상의 처음 1초 동안 이 그림에서 영상으로 바뀝니다.</div>
+            <div class="err">앞 슬라이드 이미지 경로를 넣어주세요. 첫 슬라이드면 "첫 슬라이드" 를 고르세요.</div>
+          </div>
+          <div class="field out">
+            <label for="outPath">출력 파일</label>
+            <input type="text" id="outPath" placeholder="영상 경로를 넣으면 자동으로 채워집니다" spellcheck="false" autocomplete="off">
+            <div class="help">같은 폴더에 "_transition" 이름으로 만들어집니다. 원하면 바꾸세요.</div>
+          </div>
         </div>
-      </div>
-      <pre id="cmd"></pre>
-      <details><summary>코드용 인자 배열(JSON)과 설명</summary>
-        <div class="in">
-          <div>구조: 앞 그림 1초 + 영상의 처음 1초를 <code>xfade</code>(offset 0)로 겹치고 나머지와 <code>concat</code>. 1 + D − 1 = D 라서 프레임 수가 원본과 같습니다. 움직임이 있는 효과는 전환 구간을 fps의 4배로 뽑은 뒤 <code>setpts</code>로 속도 곡선을 넣습니다. 음성은 <code>-c:a copy</code>.</div>
-          <div>영상 규격은 1920×1080, 30fps 로 고정되어 있습니다. 다른 규격의 영상이면 이 파일의 <code>SPEC</code> 값을 고치세요. 영상이 1초 이하면 전환 뒤에 남는 구간이 없어 출력이 짧아지므로, 코드에서는 길이를 먼저 확인하세요.</div>
-          <div>libopenh264 는 빌드에 따라 <code>-profile:v high</code>, <code>-rc_mode quality</code> 옵션을 지원합니다 (<code>ffmpeg -h encoder=libopenh264</code> 로 확인). 원본과 같은 프로파일이 필요하면 인코더 옵션에 추가하세요.</div>
-          <div>인코더 옵션: <input type="text" id="encArgs" style="margin-top:4px"></div>
-          <pre id="cmdJson"></pre>
+        <div class="cmdhead">
+          <div class="label">ffmpeg 명령어<span class="sub" id="cmdNote"></span></div>
+          <div class="actions">
+            <select id="enc" title="인코더"><option value="libopenh264">libopenh264 (LGPL)</option><option value="libx264">libx264</option></select>
+            <button type="button" class="copy" id="copyBtn">명령어 복사</button>
+          </div>
         </div>
-      </details>
+        <pre id="cmd"></pre>
+        <details><summary>코드용 인자 배열(JSON)과 설명</summary>
+          <div class="in">
+            <div>구조: 앞 그림 1초 + 영상의 처음 1초를 <code>xfade</code>(offset 0)로 겹치고 나머지와 <code>concat</code>. 1 + D − 1 = D 라서 프레임 수가 원본과 같습니다. 움직임이 있는 효과는 전환 구간을 fps의 4배로 뽑은 뒤 <code>setpts</code>로 속도 곡선을 넣습니다. 음성은 <code>-c:a copy</code>.</div>
+            <div>영상 규격은 1920×1080, 30fps 로 고정되어 있습니다. 다른 규격의 영상이면 이 파일의 <code>SPEC</code> 값을 고치세요. 영상이 1초 이하면 전환 뒤에 남는 구간이 없어 출력이 짧아지므로, 코드에서는 길이를 먼저 확인하세요.</div>
+            <div>libopenh264 는 빌드에 따라 <code>-profile:v high</code>, <code>-rc_mode quality</code> 옵션을 지원합니다 (<code>ffmpeg -h encoder=libopenh264</code> 로 확인). 원본과 같은 프로파일이 필요하면 인코더 옵션에 추가하세요.</div>
+            <div>인코더 옵션: <input type="text" id="encArgs" style="margin-top:4px"></div>
+            <pre id="cmdJson"></pre>
+          </div>
+        </details>
       </div>
     </div>
   </div>
@@ -162,6 +164,8 @@ const ENCODER_DEFAULTS = {
   libx264: '-c:v libx264 -preset medium -crf 14 -pix_fmt yuv420p',
 };
 const T = '1.0000';   // 전환 길이 1초 고정
+const PH = { video: '[슬라이드 영상 경로]', image: '[앞 슬라이드 이미지 경로]', out: '[출력 파일 경로]' };   // 아직 안 넣은 칸은 명령어에 이렇게 보임
+const STORE = 'slideTransitionHandoff.v1';   // 입력값을 브라우저에 기억 (새로고침해도 유지)
 const state = { source: 'image', preset: null };
 const clean = (v) => v.trim().replace(/^["']+|["']+$/g, '');    // 탐색기 "경로로 복사" 의 따옴표 제거
 
@@ -198,25 +202,52 @@ const q = (a) => /[\s;()\[\]'"{}$*?&|<>]/.test(a) ? '"' + a.replace(/"/g, '\\"')
 const oneLine = (args) => 'ffmpeg -y ' + args.map(q).join(' ');
 // BUILDER-END
 
-// ---------------------------------------------------------------- 화면
+// ---------------------------------------------------------------- 입력
 function autoOut(video) { return video.replace(/(\.[^.\\/]+)?$/, '') + '_transition.mp4'; }   // 같은 폴더, _transition 이름
+function setInvalid(id, on) { $(id).closest('.field').classList.toggle('invalid', on); }
+function missing() {   // 복사 전에 꼭 있어야 하는 칸
+  const m = [];
+  if (!clean($('videoPath').value)) m.push('videoPath');
+  if (state.source === 'image' && !clean($('imagePath').value)) m.push('imagePath');
+  return m;
+}
+function setSource(src) { state.source = src; $('srcSeg').querySelectorAll('button').forEach(x => x.classList.toggle('active', x.dataset.src === src)); }
+function save() {
+  try { localStorage.setItem(STORE, JSON.stringify({ video: $('videoPath').value, image: $('imagePath').value, out: $('outPath').value, outAuto: $('outPath').dataset.auto || '1',
+    source: state.source, enc: $('enc').value, encArgs: $('encArgs').value })); } catch {}
+}
+function load() {
+  try {
+    const d = JSON.parse(localStorage.getItem(STORE) || 'null'); if (!d) return;
+    $('videoPath').value = d.video || ''; $('imagePath').value = d.image || ''; $('outPath').value = d.out || ''; $('outPath').dataset.auto = d.outAuto || '1';
+    if (d.source === 'black' || d.source === 'image') setSource(d.source);
+    if (ENCODER_DEFAULTS[d.enc]) { $('enc').value = d.enc; $('encArgs').value = d.encArgs || ENCODER_DEFAULTS[d.enc]; }
+  } catch {}
+}
+
+// ---------------------------------------------------------------- 화면
+const esc = (t) => t.replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
 function render() {
-  const p = state.preset;
-  $('imagePath').style.display = state.source === 'image' ? '' : 'none';
-  $('srcHelp').textContent = state.source === 'image'
+  const p = state.preset, useImage = state.source === 'image';
+  $('imagePath').style.display = useImage ? '' : 'none';
+  $('imageReq').style.display = useImage ? '' : 'none';
+  $('srcHelp').textContent = useImage
     ? '바로 앞 슬라이드를 PNG/JPG 로 내보낸 파일. 영상의 처음 1초 동안 이 그림에서 영상으로 바뀝니다.'
     : '첫 슬라이드는 앞 슬라이드가 없으므로 검정 화면에서 영상으로 바뀝니다.';
+  if (!useImage) setInvalid('imagePath', false);
   if (!p) return;
   const video = clean($('videoPath').value), image = clean($('imagePath').value);
-  let out = clean($('outPath').value) || autoOut(video || 'slide2.mp4'), warn = '';
-  if (video && out.toLowerCase() === video.toLowerCase()) { out = autoOut(video); warn = ' · 출력이 입력 영상과 같아서 자동 이름으로 바꿨습니다'; }
-  const s = { video: video || 'slide2.mp4', image: image || 'slide1.png', out,
+  let out = clean($('outPath').value) || (video ? autoOut(video) : PH.out), warn = '';
+  if (video && out.toLowerCase() === video.toLowerCase()) { out = autoOut(video); warn = '출력이 입력 영상과 같아서 자동 이름으로 바꿨습니다'; }
+  const s = { video: video || PH.video, image: image || PH.image, out,
               w: SPEC.w, h: SPEC.h, fps: SPEC.fps, encArgs: $('encArgs').value };
   const args = buildArgs(p, s, state.source);
+  let html = esc(oneLine(args));
+  Object.values(PH).forEach(ph => { html = html.split(esc(ph)).join(`<mark>${esc(ph)}</mark>`); });   // 빈 칸은 노란 자리표시로
   $('cmdTitle').textContent = p.label;
-  $('cmdMeta').textContent = `xfade ${p.xfade} · ${p.easingLabel} · ` + (state.source === 'image' ? '앞 슬라이드 이미지에서 시작' : '검정 화면에서 시작');
-  $('cmdNote').textContent = (video ? '' : '영상 경로를 넣으면 예시 이름이 바뀝니다') + warn;
-  $('cmd').textContent = oneLine(args);
+  $('cmdMeta').textContent = `xfade ${p.xfade} · ${p.easingLabel}`;
+  $('cmdNote').textContent = missing().length ? '노란 자리표시에 들어갈 경로를 위에 넣어주세요' : warn;
+  $('cmd').innerHTML = html;
   $('cmdJson').textContent = JSON.stringify(['ffmpeg', '-y', ...args], null, 2);
 }
 
@@ -229,8 +260,7 @@ function openModal(p) {
   v.innerHTML = `<source src="${p.preview}" type="video/mp4"><source src="${p.previewWebm}" type="video/webm">`;
   v.load(); v.play().catch(() => {});
   render();
-  $('modal').classList.add('open'); document.body.classList.add('noscroll');
-  $('closeBtn').focus();
+  if (!$('modal').classList.contains('open')) { $('modal').classList.add('open'); document.body.classList.add('noscroll'); $('closeBtn').focus(); }
 }
 function closeModal() {
   if (!$('modal').classList.contains('open')) return;
@@ -261,14 +291,18 @@ function buildCards() {
 
 $('videoPath').addEventListener('input', () => {
   if (!$('outPath').value.trim() || $('outPath').dataset.auto === '1') { const v = clean($('videoPath').value); $('outPath').value = v ? autoOut(v) : ''; $('outPath').dataset.auto = '1'; }
-  render();
+  if (clean($('videoPath').value)) setInvalid('videoPath', false);
+  render(); save();
 });
-$('outPath').addEventListener('input', () => { $('outPath').dataset.auto = $('outPath').value.trim() ? '0' : '1'; render(); });
-$('imagePath').addEventListener('input', render);
-$('srcSeg').querySelectorAll('button').forEach(b => b.addEventListener('click', () => { state.source = b.dataset.src; $('srcSeg').querySelectorAll('button').forEach(x => x.classList.toggle('active', x === b)); render(); }));
-$('enc').addEventListener('change', () => { $('encArgs').value = ENCODER_DEFAULTS[$('enc').value]; render(); });
-$('encArgs').addEventListener('input', render);
+$('outPath').addEventListener('input', () => { $('outPath').dataset.auto = $('outPath').value.trim() ? '0' : '1'; render(); save(); });
+$('imagePath').addEventListener('input', () => { if (clean($('imagePath').value)) setInvalid('imagePath', false); render(); save(); });
+$('srcSeg').querySelectorAll('button').forEach(b => b.addEventListener('click', () => { setSource(b.dataset.src); render(); save(); }));
+$('enc').addEventListener('change', () => { $('encArgs').value = ENCODER_DEFAULTS[$('enc').value]; render(); save(); });
+$('encArgs').addEventListener('input', () => { render(); save(); });
+['videoPath', 'imagePath', 'outPath'].forEach(id => $(id).addEventListener('change', () => { const v = clean($(id).value); if (v !== $(id).value) { $(id).value = v; save(); } }));   // 칸을 벗어나면 따옴표를 눈에 보이게도 제거
 $('copyBtn').addEventListener('click', async () => {
+  const miss = missing();
+  if (miss.length) { miss.forEach(id => setInvalid(id, true)); $(miss[0]).focus(); return; }   // 빈 칸이 있으면 복사하지 않고 그 칸을 표시
   const text = $('cmd').textContent, btn = $('copyBtn');
   try { await navigator.clipboard.writeText(text); }
   catch { const ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); }
@@ -287,6 +321,7 @@ document.addEventListener('keydown', (e) => {
   if (e.key === 'ArrowRight') stepPreset(1);
 });
 $('encArgs').value = ENCODER_DEFAULTS.libopenh264;
+load();
 buildCards();
 render();
 </script>
