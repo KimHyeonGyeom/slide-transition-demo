@@ -1,0 +1,289 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>슬라이드 영상 전환 명령어 모음</title>
+<style>
+  :root { --bg:#f3f4f6; --card:#fff; --line:#e5e7eb; --line2:#d1d5db; --text:#111827; --muted:#6b7280; --accent:#2563eb; --accent2:#1d4ed8; --soft:#eff6ff; --ok:#059669; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); line-height:1.5; font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans KR", "Malgun Gothic", sans-serif; }
+  main { max-width:1200px; margin:0 auto; padding:24px 16px 80px; }
+  h1 { font-size:1.45rem; margin:0 0 4px; }
+  h2 { font-size:1.05rem; margin:0 0 12px; }
+  h3 { font-size:1rem; margin:0; }
+  p.lead { color:var(--muted); margin:0 0 16px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:16px 18px; margin:0 0 16px; box-shadow:0 1px 2px rgba(0,0,0,.04); }
+  .fields { display:grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap:12px; }
+  .fields label { display:block; font-size:.82rem; color:var(--muted); margin-bottom:3px; }
+  input[type=text], input[type=number], select { font:inherit; padding:7px 9px; border:1px solid var(--line2); border-radius:8px; width:100%; background:#fff; }
+  input[type=text].mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size:.88rem; }
+  .row { display:flex; gap:12px; flex-wrap:wrap; align-items:center; }
+  .hint { color:var(--muted); font-size:.85rem; }
+  .grid { display:grid; grid-template-columns: 1fr 1fr; gap:16px; align-items:start; }
+  @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } .sticky { position:static; } }
+  .sticky { position:sticky; top:12px; }
+  .cards { display:grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap:10px; }
+  .fx { border:1px solid var(--line); border-radius:10px; overflow:hidden; background:#fff; cursor:pointer; transition: box-shadow .15s, border-color .15s; }
+  .fx:hover { box-shadow:0 2px 8px rgba(0,0,0,.08); }
+  .fx.selected { border-color:var(--accent); box-shadow:0 0 0 2px rgba(37,99,235,.25); }
+  .fx video { width:100%; aspect-ratio:16/9; display:block; background:#000; }
+  .fx .t { padding:8px 10px 9px; }
+  .fx .n { font-weight:600; font-size:.9rem; }
+  .fx .s { font-size:.76rem; color:var(--muted); }
+  .tabs { display:flex; gap:4px; border-bottom:1px solid var(--line); margin:10px 0; flex-wrap:wrap; }
+  .tabs button { background:transparent; border:0; border-bottom:2px solid transparent; padding:8px 12px; font:inherit; font-weight:500; color:var(--muted); cursor:pointer; border-radius:0; }
+  .tabs button.active { color:var(--accent); border-bottom-color:var(--accent); }
+  button.copy { font:inherit; font-weight:500; padding:7px 14px; border-radius:8px; border:1px solid var(--accent); background:var(--accent); color:#fff; cursor:pointer; }
+  button.copy:hover { background:var(--accent2); }
+  button.copy.done { background:var(--ok); border-color:var(--ok); }
+  pre { background:#0f172a; color:#e2e8f0; padding:12px; border-radius:10px; overflow:auto; font-size:.8rem; line-height:1.45; white-space:pre-wrap; word-break:break-all; margin:8px 0 0; max-height:420px; }
+  .seg { display:inline-flex; border:1px solid var(--line2); border-radius:8px; overflow:hidden; }
+  .seg button { background:#fff; color:var(--text); border:0; border-right:1px solid var(--line2); padding:6px 12px; font:inherit; font-size:.9rem; cursor:pointer; }
+  .seg button:last-child { border-right:0; }
+  .seg button.active { background:var(--accent); color:#fff; }
+  details summary { cursor:pointer; font-weight:600; }
+  .kv { font-size:.9rem; margin:6px 0; }
+  .kv b { display:inline-block; min-width:5.5em; color:var(--muted); font-weight:500; }
+  table.spec { border-collapse:collapse; font-size:.86rem; width:100%; margin-top:8px; }
+  table.spec td, table.spec th { border-bottom:1px solid var(--line); padding:5px 8px; text-align:left; }
+  table.spec th { color:var(--muted); font-weight:500; }
+  code { background:#eef2f7; padding:1px 5px; border-radius:4px; font-size:.86em; }
+  .toggle { display:inline-flex; gap:6px; align-items:center; font-size:.9rem; }
+</style>
+</head>
+<body>
+<main>
+  <h1>슬라이드 영상 전환 명령어 모음</h1>
+  <p class="lead">슬라이드 영상(음성 포함)의 처음 1초를 "앞 슬라이드 이미지 → 이 영상" 전환으로 바꾸는 ffmpeg 명령어입니다.
+    출력은 원본과 해상도, fps, 프레임 수, 길이가 같고 음성은 그대로 복사됩니다. 효과를 고르고 명령어를 복사하세요.
+    전환 길이는 1초, 움직임(속도 곡선)은 효과별로 정해져 있습니다.</p>
+
+  <section class="card">
+    <h2>전역 설정 <span class="hint">바꾸면 모든 명령어에 바로 반영됩니다</span></h2>
+    <div class="fields">
+      <div><label>슬라이드 영상 (입력, 음성 포함)</label><input type="text" class="mono" id="gVideo" placeholder="C:/slides/slide2.mp4"></div>
+      <div><label>앞 슬라이드 이미지</label><input type="text" class="mono" id="gImage" placeholder="C:/slides/slide1.png"></div>
+      <div><label>출력 파일</label><input type="text" class="mono" id="gOut" placeholder="C:/slides/slide2_transition.mp4"></div>
+      <div><label>해상도 (가로 x 세로)</label><div class="row" style="gap:6px"><input type="number" id="gW" value="1920" style="width:7em"><span>x</span><input type="number" id="gH" value="1080" style="width:7em"></div></div>
+      <div><label>fps (30 또는 30000/1001 처럼)</label><input type="text" class="mono" id="gFps" value="30"></div>
+      <div><label>인코더</label><select id="gEnc">
+        <option value="libopenh264">libopenh264 (LGPL 빌드)</option>
+        <option value="libx264">libx264 (GPL 빌드)</option>
+        <option value="custom">직접 입력</option></select></div>
+      <div style="grid-column: 1 / -1"><label>인코더 옵션 <span class="hint">(인코더를 고르면 기본값이 채워지고, 직접 고쳐도 됩니다)</span></label><input type="text" class="mono" id="gEncArgs"></div>
+    </div>
+    <div class="row" style="margin-top:12px">
+      <label class="toggle"><input type="checkbox" id="gPlaceholders"> 경로와 규격을 자리표시자로 표시 ({VIDEO} {IMAGE} {OUT} {W} {H} {FPS})</label>
+      <span class="hint">코드에서 템플릿으로 쓸 때 켜세요.</span>
+    </div>
+    <details style="margin-top:12px"><summary>영상 규격을 모를 때: ffprobe 로 읽기</summary>
+      <p class="hint" style="margin:6px 0">결과는 <code>가로,세로,fps</code> 순서입니다. bash / PowerShell 스크립트 탭은 이 값을 자동으로 읽어 씁니다.</p>
+      <div class="row"><pre id="probeCmd" style="flex:1; margin:0"></pre><button class="copy" data-copy="probeCmd">복사</button></div>
+    </details>
+  </section>
+
+  <div class="grid">
+    <section>
+      <h2>효과 <span class="hint" id="fxCount"></span></h2>
+      <div class="cards" id="cards"></div>
+    </section>
+    <section class="card sticky" id="detail">
+      <div class="row" style="justify-content:space-between">
+        <h3 id="dTitle">효과를 고르세요</h3>
+        <div class="seg" id="srcSeg">
+          <button data-src="image" class="active">앞 슬라이드 이미지에서</button>
+          <button data-src="black">첫 슬라이드: 검정에서</button>
+          <button data-src="white">첫 슬라이드: 흰색에서</button>
+        </div>
+      </div>
+      <div id="dMeta" class="hint" style="margin-top:4px"></div>
+      <div class="tabs" id="tabs">
+        <button data-tab="oneline" class="active">한 줄 명령어</button>
+        <button data-tab="bash">bash 스크립트 (규격 자동)</button>
+        <button data-tab="ps">PowerShell (규격 자동)</button>
+        <button data-tab="json">JSON 인자 (코드용)</button>
+      </div>
+      <div class="row" style="justify-content:space-between">
+        <span class="hint" id="dTabHint"></span>
+        <button class="copy" id="copyBtn" data-copy="dCmd">복사</button>
+      </div>
+      <pre id="dCmd"></pre>
+    </section>
+  </div>
+
+  <section class="card">
+    <details open><summary>명령어가 하는 일</summary>
+      <div class="kv" style="margin-top:8px"><b>구조</b> 앞 그림을 1초짜리 스트림으로 만들고 영상의 처음 1초와 <code>xfade</code>(offset 0)로 겹친 뒤, 영상의 나머지(1초 이후)와 <code>concat</code>합니다. 1 + D − 1 = D 라서 프레임 수가 원본과 같습니다.</div>
+      <div class="kv"><b>움직임</b> xfade 는 속도가 일정하므로, 전환 구간만 fps의 4배로 선형 렌더한 뒤 <code>setpts</code> 로 시간축을 속도 곡선의 역함수 위치로 옮기고 <code>fps</code> 로 다시 샘플합니다. 페이드처럼 섞임 위주 효과는 이 단계가 없습니다.</div>
+      <div class="kv"><b>음성</b> <code>-map "N:a?" -c:a copy</code> 로 원본 오디오 스트림을 손대지 않고 복사합니다. 음성이 없는 영상도 그대로 됩니다.</div>
+      <div class="kv"><b>앞 그림</b> 앞 슬라이드 이미지는 영상 해상도에 맞춰 축소/확대되고 비율이 다르면 검정 여백을 채웁니다. 첫 슬라이드는 이미지 대신 검정/흰색 단색을 씁니다.</div>
+      <div class="kv"><b>인코더</b> LGPL ffmpeg 에는 libx264 가 없으므로 기본은 libopenh264 입니다. CRF 가 없어 비트레이트로 품질을 정하며, 정지 슬라이드는 비트레이트가 낮아도 되지만 전환 구간을 위해 1080p 기준 6Mbps 를 권장합니다. 사용 가능한 옵션은 <code>ffmpeg -h encoder=libopenh264</code> 로 확인할 수 있습니다.</div>
+      <div class="kv"><b>검증</b> 만든 뒤 원본과 비교하려면 <code>ffprobe -show_entries stream=width,height,r_frame_rate,nb_frames</code> 와 <code>ffmpeg -i 파일 -map 0:a -c copy -f md5 -</code>(오디오 md5)를 각각 돌려 같은지 보면 됩니다.</div>
+      <table class="spec"><tr><th>효과 (키)</th><th>xfade</th><th>움직임</th></tr><tbody id="specRows"></tbody></table>
+    </details>
+  </section>
+</main>
+
+<script>
+const DATA = __DATA__;
+const $ = (id) => document.getElementById(id);
+const ENCODER_DEFAULTS = {
+  libopenh264: '-c:v libopenh264 -b:v 6M -maxrate 6M -bufsize 12M -pix_fmt yuv420p',
+  libx264: '-c:v libx264 -preset medium -crf 14 -pix_fmt yuv420p',
+  custom: '',
+};
+const T = '1.0000';   // 전환 길이 1초 고정
+let selected = null, source = 'image', tab = 'oneline';
+
+// ---------------------------------------------------------------- 전역 설정 읽기
+function settings() {
+  const ph = $('gPlaceholders').checked;
+  return {
+    video: ph ? '{VIDEO}' : ($('gVideo').value.trim() || 'slide2.mp4'),
+    image: ph ? '{IMAGE}' : ($('gImage').value.trim() || 'slide1.png'),
+    out: ph ? '{OUT}' : ($('gOut').value.trim() || 'slide2_transition.mp4'),
+    w: ph ? '{W}' : String(parseInt($('gW').value) || 1920),
+    h: ph ? '{H}' : String(parseInt($('gH').value) || 1080),
+    fps: ph ? '{FPS}' : ($('gFps').value.trim() || '30'),
+    encArgs: $('gEncArgs').value.trim(),
+    placeholders: ph,
+  };
+}
+
+// ---------------------------------------------------------------- 명령어 조립 (파이썬 slide_transition.build_apply_command 와 같은 구조)
+// BUILDER-START
+function fpsParts(fps) { const m = String(fps).split('/'); return [Number(m[0]), Number(m[1] || 1)]; }
+// fps 가 자리표시자({FPS})나 스크립트 변수(${FR})면 파생값도 자리표시자/변수로 둔다
+function hiFps(fps) { if (fps === '{FPS}') return '{HI}'; if (fps === '${FR}') return '${HI}'; const [n, d] = fpsParts(fps); return d === 1 ? String(n * 4) : `${n * 4}/${d}`; }
+function headSec(fps) { if (fps === '{FPS}') return '{HEAD}'; if (fps === '${FR}') return '${HEAD}'; const [n, d] = fpsParts(fps); return (1 + 2 * d / n).toFixed(4); }
+function easeExpr(easing) {
+  if (easing === 'inout') return `if(lt(T,${T}),(0.5-sin(asin(1-2*min(T/${T},1))/3))*${T}/TB,PTS)`;
+  if (easing === 'soft') return `if(lt(T,${T}),(pow(min(T/${T},1),0.8000)/(pow(min(T/${T},1),0.8000)+pow(1-min(T/${T},1),0.8000)))*${T}/TB,PTS)`;
+  if (easing === 'out') return `if(lt(T,${T}),(1-sqrt(1-min(T/${T},1)))*${T}/TB,PTS)`;
+  return null;
+}
+const norm = (w, h, fps) => `scale=${w}:${h}:force_original_aspect_ratio=decrease,pad=${w}:${h}:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=${fps},format=yuv420p`;
+const splitArgs = (s) => s.trim() ? s.trim().split(/\s+/) : [];
+
+function buildArgs(p, s, src) {
+  const still = (rate, secs) => src === 'image'
+    ? ['-loop', '1', '-framerate', rate, '-t', secs, '-i', s.image]
+    : ['-f', 'lavfi', '-i', `color=c=${src}:s=${s.w}x${s.h}:r=${rate}:d=${secs}`];
+  const enc = splitArgs(s.encArgs), tail = ['-movflags', '+faststart', s.out];
+  const expr = easeExpr(p.easing);
+  if (!expr) {
+    return [...still(s.fps, T), '-i', s.video,
+      '-filter_complex', `[0:v]${norm(s.w, s.h, s.fps)}[a];[1:v]fps=${s.fps},format=yuv420p[b];[a][b]xfade=transition=${p.xfade}:duration=${T}:offset=0[v]`,
+      '-map', '[v]', '-map', '1:a?', '-c:a', 'copy', ...enc, ...tail];
+  }
+  const hi = hiFps(s.fps), head = headSec(s.fps);
+  return [...still(hi, T), '-t', head, '-i', s.video, '-i', s.video,
+    '-filter_complex', `[0:v]${norm(s.w, s.h, hi)}[a];[1:v]fps=${hi},format=yuv420p[b];[a][b]xfade=transition=${p.xfade}:duration=${T}:offset=0,setpts='${expr}',fps=${s.fps},trim=duration=${T},setpts=PTS-STARTPTS[tr];[2:v]trim=start=${T},setpts=PTS-STARTPTS,fps=${s.fps},format=yuv420p[rest];[tr][rest]concat=n=2:v=1:a=0[v]`,
+    '-map', '[v]', '-map', '2:a?', '-c:a', 'copy', ...enc, ...tail];
+}
+const q = (a) => /[\s;()\[\]'"{}$*?&|<>]/.test(a) ? '"' + a.replace(/"/g, '\\"') + '"' : a;
+const bq = (a) => '"' + String(a).replace(/"/g, '\\"') + '"';    // bash 대입용: 항상 따옴표
+const pq = (a) => '"' + String(a).replace(/"/g, '`"') + '"';     // PowerShell 대입용: 항상 따옴표
+const oneLine = (args) => 'ffmpeg -y ' + args.map(q).join(' ');
+
+// 스크립트: 규격을 ffprobe 로 읽어 변수로 쓴다
+function bashScript(p, s, src) {
+  const v = { ...s, video: '$VIDEO', image: '$IMAGE', out: '$OUT', w: '${W}', h: '${H}', fps: '${FR}' };
+  const args = buildArgs(p, v, src);
+  const needHi = !!easeExpr(p.easing);
+  return [`#!/usr/bin/env bash`,
+    `# ${p.label} (xfade ${p.xfade}), 전환 1초, 움직임: ${p.easingLabel}`,
+    `set -euo pipefail`,
+    `VIDEO=${bq(s.placeholders ? '{VIDEO}' : s.video)}    # 이 슬라이드 영상 (음성 포함)`,
+    src === 'image' ? `IMAGE=${bq(s.placeholders ? '{IMAGE}' : s.image)}    # 앞 슬라이드 이미지` : `# 첫 슬라이드: ${src === 'black' ? '검정' : '흰색'} 화면에서 들어옵니다`,
+    `OUT=${bq(s.placeholders ? '{OUT}' : s.out)}`,
+    ``,
+    `# 영상 규격 읽기: 가로, 세로, fps`,
+    `read -r W H FR < <(ffprobe -v error -select_streams v:0 -show_entries stream=width,height,r_frame_rate -of csv=p=0 "$VIDEO" | tr ',' ' ')`,
+    ...(needHi ? [
+      `HI=$(awk -v f="$FR" 'BEGIN{split(f,a,"/"); if(a[2]=="")a[2]=1; printf "%d/%d", a[1]*4, a[2]}')      # 4배 샘플링 fps`,
+      `HEAD=$(awk -v f="$FR" 'BEGIN{split(f,a,"/"); if(a[2]=="")a[2]=1; printf "%.4f", 1 + 2*a[2]/a[1]}')   # 전환 1초 + 2프레임`] : []),
+    ``,
+    'ffmpeg -y ' + args.map(a => /^\$\{?[A-Z]+\}?$/.test(a) ? '"' + a + '"' : q(a)).join(' ')].join('\n');
+}
+function psScript(p, s, src) {
+  const v = { ...s, video: '$VIDEO', image: '$IMAGE', out: '$OUT', w: '${W}', h: '${H}', fps: '${FR}' };
+  const args = buildArgs(p, v, src);
+  const needHi = !!easeExpr(p.easing);
+  return [`# ${p.label} (xfade ${p.xfade}), 전환 1초, 움직임: ${p.easingLabel}`,
+    `$VIDEO = ${pq(s.placeholders ? '{VIDEO}' : s.video)}    # 이 슬라이드 영상 (음성 포함)`,
+    src === 'image' ? `$IMAGE = ${pq(s.placeholders ? '{IMAGE}' : s.image)}    # 앞 슬라이드 이미지` : `# 첫 슬라이드: ${src === 'black' ? '검정' : '흰색'} 화면에서 들어옵니다`,
+    `$OUT = ${pq(s.placeholders ? '{OUT}' : s.out)}`,
+    ``,
+    `# 영상 규격 읽기: 가로, 세로, fps`,
+    `$spec = (ffprobe -v error -select_streams v:0 -show_entries stream=width,height,r_frame_rate -of csv=p=0 $VIDEO).Trim().Split(',')`,
+    `$W = $spec[0]; $H = $spec[1]; $FR = $spec[2]`,
+    ...(needHi ? [
+      `$fr = $FR.Split('/'); $num = [double]$fr[0]; $den = if ($fr.Length -gt 1) { [double]$fr[1] } else { 1 }`,
+      `$HI = "$([int]($num*4))/$([int]$den)"                                   # 4배 샘플링 fps`,
+      `$HEAD = (1 + 2*$den/$num).ToString("F4", [cultureinfo]::InvariantCulture)   # 전환 1초 + 2프레임`] : []),
+    ``,
+    '& ffmpeg -y ' + args.map(a => /^\$\{?[A-Z]+\}?$/.test(a) ? a : q(a)).join(' ')].join('\n');
+}
+function jsonArgs(p, s, src) {
+  const args = ['ffmpeg', '-y', ...buildArgs(p, s, src)];
+  const note = s.placeholders ? '// {HI} = {FPS}의 4배, {HEAD} = 1 + 2/{FPS} (소수 4자리). 예: 30fps -> HI 120, HEAD 1.0667\n' : '';
+  return note + JSON.stringify(args, null, 2);
+}
+
+// BUILDER-END
+// ---------------------------------------------------------------- 화면
+function render() {
+  const s = settings();
+  $('probeCmd').textContent = `ffprobe -v error -select_streams v:0 -show_entries stream=width,height,r_frame_rate -of csv=p=0 ${q(s.video)}`;
+  if (!selected) { $('dCmd').textContent = '왼쪽에서 효과를 고르면 여기에 명령어가 나옵니다.'; return; }
+  const p = selected;
+  $('dTitle').textContent = `${p.label}`;
+  $('dMeta').textContent = `xfade ${p.xfade} · 전환 1초 · 움직임: ${p.easingLabel} · ${source === 'image' ? '앞 슬라이드 이미지에서' : (source === 'black' ? '검정 화면에서 (첫 슬라이드)' : '흰색 화면에서 (첫 슬라이드)')}`;
+  const hints = { oneline: '전역 설정의 경로와 규격을 그대로 넣은 명령어. 터미널에 붙여 넣어 실행합니다.',
+                  bash: 'ffprobe 로 영상 규격을 읽어 자동으로 넣습니다. 경로만 바꾸면 됩니다.',
+                  ps: 'Windows PowerShell 용. ffprobe 로 규격을 읽어 자동으로 넣습니다.',
+                  json: 'subprocess / ProcessBuilder 등에 그대로 넘기는 인자 배열. 자리표시자를 켜면 템플릿이 됩니다.' };
+  $('dTabHint').textContent = hints[tab];
+  $('dCmd').textContent = tab === 'oneline' ? oneLine(buildArgs(p, s, source))
+                        : tab === 'bash' ? bashScript(p, s, source)
+                        : tab === 'ps' ? psScript(p, s, source) : jsonArgs(p, s, source);
+}
+
+function buildCards() {
+  const box = $('cards');
+  DATA.presets.forEach(p => {
+    const el = document.createElement('div'); el.className = 'fx'; el.dataset.key = p.key;
+    el.innerHTML = `<video muted loop playsinline preload="metadata"><source src="${p.preview}" type="video/mp4"><source src="${p.previewWebm}" type="video/webm"></video>
+      <div class="t"><div class="n">${p.label}</div><div class="s">${p.xfade} · ${p.easingShort}</div></div>`;
+    const v = el.querySelector('video');
+    el.addEventListener('mouseenter', () => v.play().catch(() => {}));
+    el.addEventListener('mouseleave', () => { v.pause(); v.currentTime = 0; });
+    el.addEventListener('click', () => { selected = p; document.querySelectorAll('.fx').forEach(x => x.classList.toggle('selected', x.dataset.key === p.key)); render(); if (window.innerWidth < 900) $('detail').scrollIntoView({ behavior: 'smooth' }); });
+    box.appendChild(el);
+  });
+  $('fxCount').textContent = `${DATA.presets.length}종 · 카드에 마우스를 올리면 재생됩니다`;
+  $('specRows').innerHTML = DATA.presets.map(p => `<tr><td>${p.label} (<code>${p.key}</code>)</td><td>${p.xfade}</td><td>${p.easingLabel}</td></tr>`).join('');
+}
+
+async function copyText(text, btn) {
+  try { await navigator.clipboard.writeText(text); }
+  catch { const ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); }
+  const old = btn.textContent; btn.textContent = '복사됨'; btn.classList.add('done');
+  setTimeout(() => { btn.textContent = old; btn.classList.remove('done'); }, 1200);
+}
+
+document.querySelectorAll('button.copy').forEach(b => b.addEventListener('click', () => copyText($(b.dataset.copy).textContent, b)));
+$('tabs').querySelectorAll('button').forEach(b => b.addEventListener('click', () => { tab = b.dataset.tab; $('tabs').querySelectorAll('button').forEach(x => x.classList.toggle('active', x === b)); render(); }));
+$('srcSeg').querySelectorAll('button').forEach(b => b.addEventListener('click', () => { source = b.dataset.src; $('srcSeg').querySelectorAll('button').forEach(x => x.classList.toggle('active', x === b)); render(); }));
+['gVideo', 'gImage', 'gOut', 'gW', 'gH', 'gFps', 'gEncArgs'].forEach(id => $(id).addEventListener('input', render));
+$('gPlaceholders').addEventListener('change', render);
+$('gEnc').addEventListener('change', () => { $('gEncArgs').value = ENCODER_DEFAULTS[$('gEnc').value]; render(); });
+$('gEncArgs').value = ENCODER_DEFAULTS.libopenh264;
+buildCards();
+selected = DATA.presets[0]; document.querySelector('.fx').classList.add('selected');
+render();
+</script>
+</body>
+</html>

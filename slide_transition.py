@@ -45,7 +45,8 @@ SAMPLE_AUDIO_RATE = 48000
 
 
 def fps_str(fps: Fraction) -> str:
-    return f"{fps.numerator}/{fps.denominator}"
+    """30/1 은 30 으로, 30000/1001 은 그대로."""
+    return str(fps.numerator) if fps.denominator == 1 else f"{fps.numerator}/{fps.denominator}"
 
 
 def snap(sec: float, fps: Fraction) -> float:
