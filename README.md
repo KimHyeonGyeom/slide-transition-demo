@@ -41,6 +41,18 @@ LGPL 빌드에는 libx264 가 없다. 도구는 `libopenh264 → libx264 → h26
 큰 값(상한 16Mbps)을 쓰고, `--bitrate` 로 바꿀 수 있다. 옵션(`rc_mode`, `profile`)은 실행 시점에 `ffmpeg -h encoder=libopenh264`
 결과를 보고 지원되는 것만 넣는다. 전환은 xfade, tpad, concat, setpts, fps, scale 로만 만들므로 모두 LGPL 범위다.
 
+**libopenh264 는 `-qmin 8 -qmax 24` 가 꼭 필요하다.** 비트레이트 제어가 움직임이 큰 전환 1초에서 QP 를 크게 올려 그 구간만 글씨가
+뭉개지는데, 비트레이트를 16~30Mbps 로 올려도 그대로다. ffmpeg 의 libopenh264 래퍼는 `-qmin` 과 `-qmax` 가 둘 다 있을 때만 QP 범위를
+넘기므로 하나만 주면 효과가 없다. 사진과 작은 글씨가 있는 슬라이드로 잰 전환 구간 PSNR (최저값, 1080p30 밀어내기):
+
+| 옵션 | 전환 구간 PSNR 최저 | 평균 비트레이트 |
+|---|---|---|
+| `-b:v 6M -maxrate 6M -bufsize 12M` 만 | 30.4 dB (뭉개짐) | 2.9 Mbps |
+| 위 + `-b:v 16M` 또는 `30M` | 30.3 dB (변화 없음) | - |
+| 위 + `-profile:v high -qmin 8 -qmax 24 -g 60` | 42.4 dB | 7.5 Mbps |
+| 위 + `-qmax 22` | 43.8 dB | 8.8 Mbps |
+| libx264 crf 14 (참고) | 48.4 dB | 2.3 Mbps |
+
 ## 1. 웹으로 테스트
 
 ```bash
@@ -76,7 +88,7 @@ python3 slide_transition.py list                                                
 ffmpeg -loop 1 -framerate 30 -t 0.7 -i 1.png -i 2.mp4 -filter_complex "
 [0:v]scale=1920:1080,format=yuv420p,fps=30[a];
 [1:v]fps=30,format=yuv420p[b];
-[a][b]xfade=transition=fade:duration=0.7:offset=0[v]" -map "[v]" -map 1:a -c:a copy -c:v libopenh264 -b:v 6M -pix_fmt yuv420p 2_t.mp4
+[a][b]xfade=transition=fade:duration=0.7:offset=0[v]" -map "[v]" -map 1:a -c:a copy -c:v libopenh264 -b:v 6M -maxrate 6M -bufsize 12M -profile:v high -qmin 8 -qmax 24 -g 60 -pix_fmt yuv420p 2_t.mp4
 ```
 
 첫 슬라이드는 이미지 대신 `-f lavfi -i "color=c=black:s=1920x1080:r=30:d=0.7"` 를 넣는다.
@@ -113,7 +125,9 @@ xfade 는 진행 속도가 일정하다. 그래서 전환 구간만 `fps × 4` �
   원본을 60fps 로 만들면 전환도 60fps 가 된다.
 - 전환 구간은 다시 인코딩된다 (xfade 가 프레임을 섞으려면 디코딩해야 한다). 음성은 복사라 손실이 없다.
 - 페이드는 두 그림이 겹치는 효과라 전환 중에는 겹쳐 보인다. 파워포인트도 같다.
-- 이미지가 영상보다 작으면 확대되어 흐려진다. 슬라이드 이미지는 영상 해상도 이상으로 내보낸다.
+- 이미지가 영상보다 작으면 확대되어 흐려진다. 슬라이드 이미지는 영상 해상도 이상으로 내보낸다 (파워포인트의 PNG 내보내기 기본값은
+  1280x720 이라 1080p 영상에는 작다).
+- libopenh264 로 만든 결과의 전환 1초만 뭉개지면 `-qmin 8 -qmax 24` 가 빠진 것이다 (위 "LGPL ffmpeg 과 인코더" 참고).
 
 ## 이전 도구
 

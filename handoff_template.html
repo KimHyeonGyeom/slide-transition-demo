@@ -145,7 +145,7 @@
           <div class="in">
             <div>구조: 앞 그림 1초 + 영상의 처음 1초를 <code>xfade</code>(offset 0)로 겹치고 나머지와 <code>concat</code>. 1 + D − 1 = D 라서 프레임 수가 원본과 같습니다. 움직임이 있는 효과는 전환 구간을 fps의 4배로 뽑은 뒤 <code>setpts</code>로 속도 곡선을 넣습니다. 음성은 <code>-c:a copy</code>.</div>
             <div>영상 규격은 1920×1080, 30fps 로 고정되어 있습니다. 다른 규격의 영상이면 이 파일의 <code>SPEC</code> 값을 고치세요. 영상이 1초 이하면 전환 뒤에 남는 구간이 없어 출력이 짧아지므로, 코드에서는 길이를 먼저 확인하세요.</div>
-            <div>libopenh264 는 빌드에 따라 <code>-profile:v high</code>, <code>-rc_mode quality</code> 옵션을 지원합니다 (<code>ffmpeg -h encoder=libopenh264</code> 로 확인). 원본과 같은 프로파일이 필요하면 인코더 옵션에 추가하세요.</div>
+            <div>libopenh264 주의: <code>-qmin 8 -qmax 24</code> 를 빼면 비트레이트 제어가 움직임이 큰 전환 구간에서 QP 를 크게 올려 그 1초만 글씨가 뭉개집니다 (비트레이트를 올려도 그대로). ffmpeg 의 libopenh264 는 <code>-qmin</code> 과 <code>-qmax</code> 가 둘 다 있어야 QP 범위를 적용하므로 하나만 쓰면 효과가 없습니다. 더 또렷하게 하려면 <code>-qmax 22</code> 처럼 낮추세요 (파일이 커집니다). <code>-profile:v high</code> 는 파일을 10~15% 줄여 주며, 옵션이 없다는 빌드면 빼도 됩니다.</div>
             <div>인코더 옵션: <input type="text" id="encArgs" style="margin-top:4px"></div>
             <pre id="cmdJson"></pre>
           </div>
@@ -160,7 +160,7 @@ const DATA = __DATA__;
 const SPEC = { w: '1920', h: '1080', fps: '30' };   // 파이프라인 영상 규격 (고정)
 const $ = (id) => document.getElementById(id);
 const ENCODER_DEFAULTS = {
-  libopenh264: '-c:v libopenh264 -b:v 6M -maxrate 6M -bufsize 12M -pix_fmt yuv420p',
+  libopenh264: '-c:v libopenh264 -b:v 6M -maxrate 6M -bufsize 12M -profile:v high -qmin 8 -qmax 24 -g 60 -pix_fmt yuv420p',   // qmin/qmax 는 둘 다 있어야 적용됨 (아래 설명)
   libx264: '-c:v libx264 -preset medium -crf 14 -pix_fmt yuv420p',
 };
 const T = '1.0000';   // 전환 길이 1초 고정

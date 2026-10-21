@@ -162,7 +162,9 @@ def encode_args(encoder: str, info: VideoInfo, bitrate: int | None = None) -> li
             args += ["-rc_mode", "quality"]
         if "profile" in h:
             args += ["-profile:v", openh264_profile(info)]
-        args += ["-qmin", "8", "-qmax", "30", "-g", str(max(1, round(float(info.fps) * 2)))]
+        # qmin/qmax 는 둘 다 줘야 적용된다 (ffmpeg libopenh264 래퍼). 없으면 비트레이트 제어가 전환 1초에서 QP 를
+        # 크게 올려 글씨가 뭉개진다 (어려운 슬라이드 기준 전환 구간 PSNR 30dB -> qmax 24 면 42dB, 비트레이트만 올려서는 안 바뀜).
+        args += ["-qmin", "8", "-qmax", "24", "-g", str(max(1, round(float(info.fps) * 2)))]
     elif encoder == "libx264":
         args = ["-c:v", "libx264", "-preset", "medium", "-crf", "14"]
     elif encoder == "h264_nvenc":
