@@ -35,8 +35,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from slide_render import (PRESETS, EASINGS, MAX_TRANSITION, DEFAULT_TRANSITION_DURATION, EASE_OVERSAMPLE,  # noqa: E402
-                          SAMPLE_COLORS, SAMPLE_DURATIONS, WORK, OUT, resolve_transition, ease_setpts,
-                          xfade_transitions, run, ffmpeg, command_text, font_opt, make_slide_image)
+                          SAMPLE_COLORS, SAMPLE_DURATIONS, WORK, OUT, APPEAR, resolve_transition, ease_setpts,
+                          appear_x_expr, xfade_transitions, run, ffmpeg, command_text, font_opt, make_slide_image)
 
 ENCODER_PREFERENCE = ["libopenh264", "libx264", "h264_videotoolbox", "h264_nvenc", "h264_qsv",
                       "h264_amf", "h264_mf", "h264_vaapi"]
@@ -213,6 +213,22 @@ def build_apply_command(info: VideoInfo, prev: str, transition: str, out: Path,
 
     enc = encode_args(encoder, info, bitrate)
     tail = ["-movflags", "+faststart", str(out)]
+
+    if xf in APPEAR:
+        # 나타내기: 앞 그림 위에 영상 k 의 처음 t초를 살짝 밀려 들어오며 페이드인(알파)으로 얹는다. xfade 를 쓰지 않는다.
+        # 입력 0: 앞 그림 t초, 입력 1: 영상 k 앞부분(t초 + 2프레임), 입력 2: 영상 k 전체(나머지와 음성)
+        extra = 2 / f
+        x = appear_x_expr(xf, easing, t, w)
+        return [*still(f, t), "-t", f"{float(t + extra):.4f}", "-i", str(info.path), "-i", str(info.path),
+                "-filter_complex",
+                f"[0:v]{norm(f)}[a];"
+                f"[1:v]trim=duration={t:.4f},setpts=PTS-STARTPTS,fps={fs},format=yuva420p,"
+                f"fade=t=in:st=0:d={t:.4f}:alpha=1[b];"
+                f"[a][b]overlay=x='{x}':y=0:eof_action=pass,format={pixfmt},trim=duration={t:.4f},setpts=PTS-STARTPTS[tr];"
+                f"[2:v]trim=start={t:.4f},setpts=PTS-STARTPTS,fps={fs},format={pixfmt}[rest];"
+                f"[tr][rest]concat=n=2:v=1:a=0[v]",
+                "-map", "[v]", "-map", "2:a?", "-c:a", "copy", *enc, *tail]
+
     setpts = ease_setpts(easing, t)
     if setpts is None:
         # 입력 0: 앞 그림 t초, 입력 1: 영상 k 전체. xfade offset=0 -> 길이 = t + D - t = D
@@ -273,7 +289,8 @@ def report(info: VideoInfo, out: Path, transition: str, tdur: float | None, easi
     t = snap(tdur if tdur is not None else def_dur, info.fps)
     ease = easing or def_ease
     src = START_COLORS.get(prev, f"앞 슬라이드 이미지({Path(prev).name})")
-    lines = [f"0.000s ~ {t:.3f}s  {label} [xfade {xf}], 움직임: {EASINGS[ease]}, {src} -> 이 영상"]
+    tech = "overlay+fade" if xf in APPEAR else f"xfade {xf}"
+    lines = [f"0.000s ~ {t:.3f}s  {label} [{tech}], 움직임: {EASINGS[ease]}, {src} -> 이 영상"]
     print(f"-> {out}")
     for line in lines:
         print("   " + line)

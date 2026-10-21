@@ -63,6 +63,8 @@ def main() -> None:
         total += len(mp4) + len(webm)
         presets.append({
             "key": key, "label": label, "xfade": xf, "easing": ease,
+            "tech": "overlay + fade" if xf in sr.APPEAR else f"xfade {xf}",
+            "techShort": "overlay+fade" if xf in sr.APPEAR else xf,
             "easingLabel": sr.EASINGS[ease], "easingShort": EASING_SHORT[ease],
             "preview": "data:video/mp4;base64," + base64.b64encode(mp4).decode(),
             "previewWebm": "data:video/webm;base64," + base64.b64encode(webm).decode(),

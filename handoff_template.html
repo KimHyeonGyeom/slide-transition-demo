@@ -143,7 +143,7 @@
         <pre id="cmd"></pre>
         <details><summary>코드용 인자 배열(JSON)과 설명</summary>
           <div class="in">
-            <div>구조: 앞 그림 1초 + 영상의 처음 1초를 <code>xfade</code>(offset 0)로 겹치고 나머지와 <code>concat</code>. 1 + D − 1 = D 라서 프레임 수가 원본과 같습니다. 움직임이 있는 효과는 전환 구간을 fps의 4배로 뽑은 뒤 <code>setpts</code>로 속도 곡선을 넣습니다. 음성은 <code>-c:a copy</code>.</div>
+            <div>구조: 앞 그림 1초 + 영상의 처음 1초를 <code>xfade</code>(offset 0)로 겹치고 나머지와 <code>concat</code>. 1 + D − 1 = D 라서 프레임 수가 원본과 같습니다. 움직임이 있는 효과는 전환 구간을 fps의 4배로 뽑은 뒤 <code>setpts</code>로 속도 곡선을 넣습니다. 나타내기는 xfade 대신 <code>overlay</code>(살짝 이동)와 <code>fade</code>(알파 페이드인)로 만듭니다. 음성은 <code>-c:a copy</code>.</div>
             <div>영상 규격은 1920×1080, 30fps 로 고정되어 있습니다. 다른 규격의 영상이면 이 파일의 <code>SPEC</code> 값을 고치세요. 영상이 1초 이하면 전환 뒤에 남는 구간이 없어 출력이 짧아지므로, 코드에서는 길이를 먼저 확인하세요.</div>
             <div>libopenh264 주의: <code>-qmin 8 -qmax 24</code> 를 빼면 비트레이트 제어가 움직임이 큰 전환 구간에서 QP 를 크게 올려 그 1초만 글씨가 뭉개집니다 (비트레이트를 올려도 그대로). ffmpeg 의 libopenh264 는 <code>-qmin</code> 과 <code>-qmax</code> 가 둘 다 있어야 QP 범위를 적용하므로 하나만 쓰면 효과가 없습니다. 더 또렷하게 하려면 <code>-qmax 22</code> 처럼 낮추세요 (파일이 커집니다). <code>-profile:v high</code> 는 파일을 10~15% 줄여 주며, 옵션이 없다는 빌드면 빼도 됩니다.</div>
             <div>인코더 옵션: <input type="text" id="encArgs" style="margin-top:4px"></div>
@@ -182,11 +182,23 @@ function easeExpr(easing) {
 }
 const norm = (w, h, fps) => `scale=${w}:${h}:force_original_aspect_ratio=decrease,pad=${w}:${h}:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=${fps},format=yuv420p`;
 const splitArgs = (s) => s.trim() ? s.trim().split(/\s+/) : [];
+function appearX(xf, easing, w) {   // 나타내기(overlay + fade)의 x 식. 파이썬 appear_x_expr 와 같은 구조
+  const u = `min(t/${T},1)`;
+  const curve = easing === 'inout' ? `1-${u}*${u}*(3-2*${u})`
+    : easing === 'soft' ? `1-pow(${u},1.2500)/(pow(${u},1.2500)+pow(1-${u},1.2500))`
+    : easing === 'out' ? `pow(1-${u},2)` : `1-${u}`;
+  return (xf === 'appear_left' ? '-' : '') + `(${curve})*${Math.round(Number(w) * 0.075)}`;
+}
 function buildArgs(p, s, src) {
   const still = (rate, secs) => src === 'image'
     ? ['-loop', '1', '-framerate', rate, '-t', secs, '-i', s.image]
     : ['-f', 'lavfi', '-i', `color=c=${src}:s=${s.w}x${s.h}:r=${rate}:d=${secs}`];
   const enc = splitArgs(s.encArgs), tail = ['-movflags', '+faststart', s.out];
+  if (p.xfade === 'appear_right' || p.xfade === 'appear_left') {
+    return [...still(s.fps, T), '-t', headSec(s.fps), '-i', s.video, '-i', s.video,
+      '-filter_complex', `[0:v]${norm(s.w, s.h, s.fps)}[a];[1:v]trim=duration=${T},setpts=PTS-STARTPTS,fps=${s.fps},format=yuva420p,fade=t=in:st=0:d=${T}:alpha=1[b];[a][b]overlay=x='${appearX(p.xfade, p.easing, s.w)}':y=0:eof_action=pass,format=yuv420p,trim=duration=${T},setpts=PTS-STARTPTS[tr];[2:v]trim=start=${T},setpts=PTS-STARTPTS,fps=${s.fps},format=yuv420p[rest];[tr][rest]concat=n=2:v=1:a=0[v]`,
+      '-map', '[v]', '-map', '2:a?', '-c:a', 'copy', ...enc, ...tail];
+  }
   const expr = easeExpr(p.easing);
   if (!expr) {
     return [...still(s.fps, T), '-i', s.video,
@@ -245,7 +257,7 @@ function render() {
   let html = esc(oneLine(args));
   Object.values(PH).forEach(ph => { html = html.split(esc(ph)).join(`<mark>${esc(ph)}</mark>`); });   // 빈 칸은 노란 자리표시로
   $('cmdTitle').textContent = p.label;
-  $('cmdMeta').textContent = `xfade ${p.xfade} · ${p.easingLabel}`;
+  $('cmdMeta').textContent = `${p.tech} · ${p.easingLabel}`;
   $('cmdNote').textContent = missing().length ? '노란 자리표시에 들어갈 경로를 위에 넣어주세요' : warn;
   $('cmd').innerHTML = html;
   $('cmdJson').textContent = JSON.stringify(['ffmpeg', '-y', ...args], null, 2);
@@ -279,7 +291,7 @@ function buildCards() {
     const el = document.createElement('div'); el.className = 'fx'; el.dataset.key = p.key; el.tabIndex = 0;
     el.setAttribute('role', 'button'); el.setAttribute('aria-label', `${p.label} 크게 보기`);
     el.innerHTML = `<video muted loop playsinline preload="auto"><source src="${p.preview}" type="video/mp4"><source src="${p.previewWebm}" type="video/webm"></video>
-      <div class="t"><div class="n">${p.label}</div><div class="s">${p.xfade} · ${p.easingShort}</div></div>`;
+      <div class="t"><div class="n">${p.label}</div><div class="s">${p.techShort} · ${p.easingShort}</div></div>`;
     const v = el.querySelector('video');
     el.addEventListener('mouseenter', () => v.play().catch(() => {}));
     el.addEventListener('mouseleave', () => { v.pause(); v.currentTime = 0; });

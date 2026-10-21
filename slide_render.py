@@ -46,7 +46,9 @@ EASE_OVERSAMPLE = 4                   # 이징: 전환 구간을 FPS*4 로 먼�
 # 방향은 "새 슬라이드가 어디에서 들어오는지" 기준 (파워포인트의 '오른쪽에서' 와 같은 표현)
 PRESETS = {
     "fade":          ("페이드",                  "fade",        0.7, "none"),
-    "fade_black":    ("페이드 (검정 거쳐서)",     "fadeblack",   0.7, "none"),
+    # 나타내기는 xfade 가 아니라 overlay + fade(알파): 새 슬라이드가 살짝 밀려 들어오며 페이드인 (APPEAR 참고)
+    "appear_right":  ("나타내기 (오른쪽에서)",    "appear_right", 1.0, "out"),
+    "appear_left":   ("나타내기 (왼쪽에서)",      "appear_left",  1.0, "out"),
     "push_right":    ("밀어내기 (오른쪽에서)",    "slideleft",   1.0, "inout"),
     "push_left":     ("밀어내기 (왼쪽에서)",      "slideright",  1.0, "inout"),
     "push_bottom":   ("밀어내기 (아래에서)",      "slideup",     1.0, "inout"),
@@ -68,7 +70,6 @@ PRESETS = {
     "zoom":          ("확대",                    "zoomin",      1.0, "inout"),
     "blinds":        ("블라인드",                "hlslice",     1.0, "inout"),
     "dissolve":      ("디졸브",                  "dissolve",    1.0, "none"),
-    "flash":         ("밝기 변화 (흰색 거쳐서)",  "fadewhite",   0.7, "none"),
 }
 EASINGS = {
     "inout": "부드럽게 (천천히 시작해서 천천히 끝)",
@@ -77,6 +78,9 @@ EASINGS = {
     "none":  "일정한 속도",
 }
 SOFT_GAMMA = 1.25   # soft 곡선 세기. 1 이면 일정 속도, 클수록 inout 에 가까워진다
+# 나타내기: "xfade 이름" 자리에 들어가는 가짜 이름 -> 새 슬라이드가 들어오는 방향(+1 오른쪽에서, -1 왼쪽에서)
+APPEAR = {"appear_right": 1, "appear_left": -1}
+APPEAR_SHIFT = 0.075   # 이동 거리 = 폭의 7.5% (1920 이면 144px)
 # 원본 xfade 이름을 직접 쓸 때, 움직임이 아니라 섞임 위주라 이징이 의미 없는 것들
 LINEAR_RAW = {"fade", "fadeblack", "fadewhite", "fadefast", "fadeslow", "fadegrays",
               "dissolve", "pixelize", "hblur", "distance"}
@@ -176,6 +180,23 @@ def ease_setpts(easing: str, t: float) -> str | None:
     return f"if(lt(T,{t:.4f}),{inv}*{t:.4f}/TB,PTS)"
 
 
+def appear_x_expr(xf: str, easing: str, t: float, w: int) -> str:
+    """나타내기의 overlay x 식. 진행도 u = t/전환길이 (0~1), 오프셋 = 이동거리 * (1 - 속도곡선(u)).
+    t 는 overlay 의 프레임 시각 변수(초). 페이드(알파)는 fade 필터가 일정하게, 이동만 이 곡선을 따른다."""
+    u = f"min(t/{t:.4f},1)"
+    if easing == "inout":
+        curve = f"1-{u}*{u}*(3-2*{u})"
+    elif easing == "soft":
+        g = f"{SOFT_GAMMA:.4f}"
+        curve = f"1-pow({u},{g})/(pow({u},{g})+pow(1-{u},{g}))"
+    elif easing == "out":
+        curve = f"pow(1-{u},2)"
+    else:
+        curve = f"1-{u}"
+    dx = int(w * APPEAR_SHIFT + 0.5)
+    return f"{'-' if APPEAR[xf] < 0 else ''}({curve})*{dx}"
+
+
 def norm_chain(w: int = WIDTH, h: int = HEIGHT, fps: int = FPS) -> str:
     """이미지를 공통 규격으로. 비율이 다르면 여백(검정)을 채운다."""
     return (f"scale={w}:{h}:force_original_aspect_ratio=decrease,"
@@ -214,6 +235,20 @@ def build_render_command(image: Path, duration: float, out: Path,
         raise ValueError("움직임(easing)은 inout / soft / out / none 중 하나")
     if t >= d:
         raise ValueError("전환 길이는 슬라이드 길이보다 짧아야 합니다")
+
+    if xf in APPEAR:
+        # 나타내기: 앞 이미지 위에 이 이미지를 살짝 밀려 들어오며 페이드인(알파)으로 얹는다. xfade 를 쓰지 않는다.
+        extra = 2 / fps
+        x = appear_x_expr(xf, easing, t, w)
+        return ["-loop", "1", "-framerate", str(fps), "-t", f"{t:.4f}", "-i", str(prev_image),
+                "-loop", "1", "-framerate", str(fps), "-t", f"{t + extra:.4f}", "-i", str(image),
+                "-loop", "1", "-framerate", str(fps), "-t", f"{d - t:.4f}", "-i", str(image),
+                "-filter_complex",
+                f"[0:v]{norm}[a];[1:v]{norm},trim=duration={t:.4f},setpts=PTS-STARTPTS,format=yuva420p,"
+                f"fade=t=in:st=0:d={t:.4f}:alpha=1[b];"
+                f"[a][b]overlay=x='{x}':y=0:eof_action=pass,format=yuv420p,trim=duration={t:.4f},setpts=PTS-STARTPTS[tr];"
+                f"[2:v]{norm}[rest];[tr][rest]concat=n=2:v=1:a=0[v]",
+                "-map", "[v]", "-t", f"{d:.4f}", *_encode_args(out)]
 
     setpts = ease_setpts(easing, t)
     if setpts is None:

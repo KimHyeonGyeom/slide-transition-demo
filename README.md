@@ -97,7 +97,8 @@ ffmpeg -loop 1 -framerate 30 -t 0.7 -i 1.png -i 2.mp4 -filter_complex "
 
 | 키 | 이름 | xfade | 기본 길이 | 움직임 |
 |---|---|---|---|---|
-| fade / fade_black | 페이드 / 페이드 (검정 거쳐서) | fade / fadeblack | 0.7s | 일정 |
+| fade | 페이드 | fade | 0.7s | 일정 |
+| appear_right / appear_left | 나타내기 (새 슬라이드가 살짝 밀려 들어오며 페이드인) | xfade 아님: overlay + fade(alpha) | 1.0s | 감속 |
 | push_right / push_left / push_bottom / push_top | 밀어내기 (새 슬라이드가 들어오는 방향) | slideleft / slideright / slideup / slidedown | 1.0s | 부드럽게 |
 | wipe_right / wipe_left / wipe_bottom / wipe_top | 닦아내기 | wipeleft / wiperight / wipeup / wipedown | 1.0s | 살짝 부드럽게 |
 | cover_right / cover_left | 덮기 | coverleft / coverright | 1.0s | 부드럽게 |
@@ -108,7 +109,9 @@ ffmpeg -loop 1 -framerate 30 -t 0.7 -i 1.png -i 2.mp4 -filter_complex "
 | zoom | 확대 | zoomin | 1.0s | 부드럽게 |
 | blinds | 블라인드 | hlslice | 1.0s | 부드럽게 |
 | dissolve | 디졸브 | dissolve | 1.0s | 일정 |
-| flash | 밝기 변화 (흰색 거쳐서) | fadewhite | 0.7s | 일정 |
+
+나타내기는 xfade 에 없는 효과라 따로 만든다: 영상의 처음 1초를 `format=yuva420p,fade=t=in:alpha=1` 로 알파 페이드인하고
+`overlay=x='(1-u)^2 * 폭의 7.5%'` 로 살짝 밀려 들어오게 앞 그림 위에 얹은 뒤 나머지와 concat 한다 (움직임 곡선만 easing 을 따른다).
 
 움직임(easing)은 `inout`(부드럽게), `soft`(살짝 부드럽게), `out`(감속), `none`(일정한 속도) 중 고른다.
 닦아내기에 xfade 의 smooth 계열을 쓰지 않는 이유: 그라데이션 띠가 넓어서 앞선이 0.6초 만에 화면을 가로질러 빠르게 느껴진다.
